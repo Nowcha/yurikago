@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// 設計方針:
+// - publicリポ前提のため、防御はこのルールがすべて。認証済み かつ 世帯メンバーのみアクセス可
+// - メンバー追加は「相手のUIDを既存メンバーが登録する」方式（招待コード方式はSparkプランで
+//   安全に実装できないため不採用。Cloud Functionsを使わない制約による）
+// - 世帯は最大2名（夫婦専用）
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(hid) {
+      return isSignedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/households/$(hid)).data.memberUids;
+    }
+
+    match /households/{hid} {
+
+      // 作成: 自分自身を含む最大2名のmemberUidsでのみ作成可
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.memberUids
+        && request.resource.data.memberUids.size() >= 1
+        && request.resource.data.memberUids.size() <= 2;
+
+      // 読み取り: メンバーのみ。
+      // クライアントは where('memberUids','array-contains', uid) で自分の世帯を検索する
+      allow read: if isSignedIn()
+        && request.auth.uid in resource.data.memberUids;
+
+      // 更新: メンバーのみ。memberUidsは2名以下を維持し、自分自身は必ず残す
+      // （パートナーのUID追加もこのルールで許可される: 既存メンバーが実行するため）
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.memberUids
+        && request.auth.uid in request.resource.data.memberUids
+        && request.resource.data.memberUids.size() <= 2;
+
+      // 削除: メンバーのみ
+      allow delete: if isSignedIn()
+        && request.auth.uid in resource.data.memberUids;
+
+      // サブコレクション（tasks / items / records）: 世帯メンバーのみ全操作可
+      match /{collection}/{docId} {
+        allow read, write: if isMember(hid);
+      }
+    }
+
+    // 上記以外は全拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

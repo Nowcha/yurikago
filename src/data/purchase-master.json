@@ -1,0 +1,22 @@
+{
+  "version": "0.1",
+  "note": "定番の出産準備リスト。数量・要否は家庭により調整。waitUntilBorn=trueは『生まれてから様子を見て買う』推奨品（買いすぎ防止）。",
+  "items": [
+    { "name": "短肌着・コンビ肌着（各5枚目安）", "category": "clothing", "neededBy": { "type": "beforeDue", "days": 30 }, "method": "undecided", "budget": 8000, "status": "todo" },
+    { "name": "ベビードレス・退院用ウェア", "category": "clothing", "neededBy": { "type": "beforeDue", "days": 21 }, "method": "undecided", "budget": 5000, "status": "todo" },
+    { "name": "チャイルドシート（退院時に車を使う場合は必須）", "category": "outing", "neededBy": { "type": "beforeDue", "days": 30 }, "method": "undecided", "budget": 30000, "status": "todo", "memo": "レンタルも有力。江東区はチャイルドシートレンタルあっせんあり" },
+    { "name": "ベビーバス", "category": "bath", "neededBy": { "type": "beforeDue", "days": 21 }, "method": "undecided", "budget": 3000, "status": "todo" },
+    { "name": "ベビーソープ・ガーゼ・湯温計", "category": "bath", "neededBy": { "type": "beforeDue", "days": 21 }, "method": "buy", "budget": 3000, "status": "todo" },
+    { "name": "哺乳瓶2本＋乳首・洗浄消毒セット", "category": "feeding", "neededBy": { "type": "beforeDue", "days": 21 }, "method": "buy", "budget": 6000, "status": "todo" },
+    { "name": "粉ミルク（小缶1つ）", "category": "feeding", "neededBy": { "type": "beforeDue", "days": 14 }, "method": "buy", "budget": 2000, "status": "todo", "memo": "産院で使う銘柄を確認してから買うと安心" },
+    { "name": "新生児用おむつ1パック＋おしりふき", "category": "other", "neededBy": { "type": "beforeDue", "days": 14 }, "method": "buy", "budget": 3000, "status": "todo", "memo": "サイズアウトが早いので買いだめしない" },
+    { "name": "ベビー布団・寝床（ベビーベッド or 布団）", "category": "sleep", "neededBy": { "type": "beforeDue", "days": 30 }, "method": "undecided", "budget": 20000, "status": "todo" },
+    { "name": "おくるみ・バスタオル", "category": "sleep", "neededBy": { "type": "beforeDue", "days": 21 }, "method": "undecided", "budget": 4000, "status": "todo" },
+    { "name": "ベビー用爪切り・綿棒・体温計", "category": "other", "neededBy": { "type": "beforeDue", "days": 14 }, "method": "buy", "budget": 4000, "status": "todo" },
+    { "name": "抱っこ紐", "category": "outing", "neededBy": { "type": "afterBirth", "days": 30 }, "method": "undecided", "budget": 25000, "status": "todo", "waitUntilBorn": true, "memo": "体格との相性があるので産後に試着推奨" },
+    { "name": "ベビーカー", "category": "outing", "neededBy": { "type": "afterBirth", "days": 60 }, "method": "undecided", "budget": 50000, "status": "todo", "waitUntilBorn": true, "memo": "赤ちゃんファーストのギフト交換候補にもなる" },
+    { "name": "搾乳器", "category": "feeding", "neededBy": { "type": "afterBirth", "days": 30 }, "method": "undecided", "budget": 15000, "status": "todo", "waitUntilBorn": true, "memo": "母乳の状況を見てから。レンタルも可" },
+    { "name": "産褥ショーツ・母乳パッド（ママ用品）", "category": "mom", "neededBy": { "type": "beforeDue", "days": 30 }, "method": "buy", "budget": 5000, "status": "todo" },
+    { "name": "円座クッション・授乳クッション", "category": "mom", "neededBy": { "type": "beforeDue", "days": 21 }, "method": "undecided", "budget": 6000, "status": "todo" }
+  ]
+}

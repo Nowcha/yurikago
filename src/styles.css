@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/*
+ * デザイン方針: モノクロ・ミニマル（みんなの銀行系）
+ * - 色はベース(白)と墨色のみ。赤(alert)は法定期限の警告に限定
+ * - 角丸は控えめ、影よりも1pxの罫線、タイポグラフィと余白で階層を作る
+ */
+@theme {
+  --color-base: #FAFAFA;      /* 背景 */
+  --color-surface: #F1F1F1;   /* 面（チップ・入力欄） */
+  --color-ink: #1A1A1A;       /* 文字・主要色 */
+  --color-accent: #1A1A1A;    /* アクション（=墨色） */
+  --color-sub: #767676;       /* 補助テキスト・中間強調 */
+  --color-alert: #D64545;     /* 法定期限・破壊的操作のみ */
+  --font-display: "Noto Sans JP", system-ui, sans-serif;
+  --font-sans: "Noto Sans JP", system-ui, sans-serif;
+}
+
+html { -webkit-tap-highlight-color: transparent; }
+body { background: var(--color-base); color: var(--color-ink); }
+input, textarea, button { font-family: inherit; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

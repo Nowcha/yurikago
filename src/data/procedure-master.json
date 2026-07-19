@@ -1,0 +1,370 @@
+{
+  "version": "0.1-draft",
+  "note": "金額・期限は2026-07時点の公式サイト調査に基づく。実装時にlinksの公式ページで再確認すること。健保組合固有の項目（付加給付・被扶養者追加期限）は要確認。",
+  "templates": [
+    {
+      "id": "hospital-direct-payment",
+      "title": "出産育児一時金の直接支払制度 合意書を産院と締結",
+      "category": "procedure",
+      "authority": "hospital",
+      "trigger": {
+        "type": "beforeDue",
+        "days": 60
+      },
+      "deadline": "soft",
+      "notes": "出生児1人につき50万円。産院が直接支払制度に対応しているか確認。健保組合の付加給付の有無も要確認。",
+      "links": [
+        {
+          "label": "江東区: 出産育児一時金（制度説明の参考）",
+          "url": "https://www.city.koto.lg.jp/250104/fukushi/kokumin/kyufu/5170.html"
+        }
+      ]
+    },
+    {
+      "id": "maternity-leave-request",
+      "title": "産休の会社申請（妻）",
+      "category": "work",
+      "authority": "employer",
+      "trigger": {
+        "type": "beforeDue",
+        "days": 70
+      },
+      "deadline": "soft",
+      "notes": "産前休業は予定日6週間前から取得可。就業規則の申請期限を確認して期限を上書きする。"
+    },
+    {
+      "id": "childcare-leave-request",
+      "title": "育休の会社申請（夫婦それぞれ）",
+      "category": "work",
+      "authority": "employer",
+      "trigger": {
+        "type": "beforeDue",
+        "days": 45
+      },
+      "deadline": "hard",
+      "notes": "法定では開始予定日の1か月前まで（産後パパ育休は2週間前まで）。出生後休業支援給付金（両親とも一定期間取得で給付率上乗せ）の適用条件を人事に確認。",
+      "conditions": [
+        {
+          "field": "hasChildcareLeave",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "ninpu-shien-2nd",
+      "title": "妊婦のための支援給付（2回目・5万円×胎児数）の申請",
+      "category": "procedure",
+      "authority": "koto",
+      "trigger": {
+        "type": "beforeDue",
+        "days": 40
+      },
+      "deadline": "soft",
+      "notes": "妊娠後期〜出産後に区から案内が届く。区窓口で申請（赤ちゃんファーストとは申請先が別）。"
+    },
+    {
+      "id": "jintsu-taxi",
+      "title": "陣痛タクシーの事前登録",
+      "category": "prep",
+      "trigger": {
+        "type": "beforeDue",
+        "days": 60
+      },
+      "deadline": "soft"
+    },
+    {
+      "id": "hospital-bag",
+      "title": "入院バッグの準備完了",
+      "category": "prep",
+      "authority": "hospital",
+      "trigger": {
+        "type": "beforeDue",
+        "days": 30
+      },
+      "deadline": "soft",
+      "notes": "産院指定の持ち物リストを転記する。"
+    },
+    {
+      "id": "birth-registration",
+      "title": "出生届の提出",
+      "category": "procedure",
+      "authority": "koto",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 14,
+        "countFrom": "birthInclusive"
+      },
+      "deadline": "hard",
+      "prepTasks": [
+        "届出人・提出者を決める（産後は父が行くケースが多い）",
+        "提出窓口を決める: 区役所戸籍係（本庁2階）or 豊洲シビックセンター3階",
+        "名前の候補と使用可能漢字の確認",
+        "出生届と同日に児童手当・子ども医療証・マイナカード特急発行をまとめて申請する段取りを確認"
+      ],
+      "notes": "出生日を含め14日以内。出生証明書は産院が出生届用紙に記入してくれる。母子手帳持参。",
+      "links": [
+        {
+          "label": "江東区: 出生届",
+          "url": "https://www.city.koto.lg.jp/060302/kurashi/jumin/koseki/5061.html"
+        }
+      ]
+    },
+    {
+      "id": "child-allowance",
+      "title": "児童手当の認定請求",
+      "category": "procedure",
+      "authority": "koto",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 15
+      },
+      "deadline": "hard",
+      "prepTasks": [
+        "受給者（生計中心者＝所得が高い方）を確認",
+        "受給者名義の振込口座情報を控える",
+        "夫婦のマイナンバーを控える",
+        "受給者の健康保険情報のコピー準備（厚生年金加入者）"
+      ],
+      "notes": "出生翌日から15日以内（15日特例）。遅れると遡及されない月が発生。所得制限なし・高校生年代まで支給。出生届と同日申請推奨。窓口: こども家庭支援課給付係 or 豊洲特別出張所。マイナポータル電子申請・郵送も可。",
+      "links": [
+        {
+          "label": "江東区: 児童手当",
+          "url": "https://www.city.koto.lg.jp/281011/kodomo/kosodate/teate/jidouteate.html"
+        }
+      ]
+    },
+    {
+      "id": "health-insurance-dependent",
+      "title": "健康保険の被扶養者追加（会社）",
+      "category": "procedure",
+      "authority": "employer",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 5
+      },
+      "deadline": "hard",
+      "prepTasks": [
+        "どちらの健保に入れるか決める（原則所得が高い方）",
+        "会社の申請様式と必要書類を人事に確認"
+      ],
+      "notes": "期限は健保組合規定（5日以内目安が多い）。医療証（マル乳）の申請に子の保険情報が必要なため最優先。"
+    },
+    {
+      "id": "maru-nyu",
+      "title": "子ども医療費助成（マル乳医療証）の交付申請",
+      "category": "procedure",
+      "authority": "koto",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 30
+      },
+      "deadline": "soft",
+      "prepTasks": [
+        "子の健康保険加入を先に済ませる（保険情報が必要）"
+      ],
+      "notes": "江東区は18歳年度末まで医療費助成。子の保険情報が確認できるものと本人確認書類が必要。窓口・電子申請（マイナポータル）・郵送可。健保加入前でも申請可否を窓口に確認するとよい。",
+      "links": [
+        {
+          "label": "江東区: 子ども医療費助成",
+          "url": "https://www.city.koto.lg.jp/281011/kodomo/kosodate/teate/5844.html"
+        }
+      ]
+    },
+    {
+      "id": "018-babyfirst",
+      "title": "018サポート＋赤ちゃんファーストの同時申請",
+      "category": "procedure",
+      "authority": "tokyo",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 30
+      },
+      "deadline": "soft",
+      "prepTasks": [
+        "マイナンバーカードと公的個人認証アプリの準備"
+      ],
+      "notes": "018サポートは月5,000円の現金給付。赤ちゃんファーストは10万円相当ギフト（2026年1月〜2027年3月出生は+3万円のプラス上乗せ、追加手続き不要）。018サポートのサイトから同時申請可。ギフトカード到着まで4か月程度、ポイントは登録から6か月で失効するので届いたら即登録。",
+      "links": [
+        {
+          "label": "018サポート",
+          "url": "https://018support.metro.tokyo.lg.jp/"
+        },
+        {
+          "label": "東京都: 赤ちゃんファースト",
+          "url": "https://www.fukushi.metro.tokyo.lg.jp/kodomo/shussan/tokyo_shussankosodateouen"
+        }
+      ]
+    },
+    {
+      "id": "birth-notice-postcard",
+      "title": "出生通知票（はがき）を保健相談所へ送付",
+      "category": "procedure",
+      "authority": "koto",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 14
+      },
+      "deadline": "soft",
+      "notes": "母と子の保健バッグに同封。これを基に新生児訪問（こんにちは赤ちゃん訪問）が行われ、面談完了が赤ちゃんファースト出産時分の申請案内につながる。",
+      "links": [
+        {
+          "label": "江東区: 赤ちゃんが生まれたら",
+          "url": "https://www.city.koto.lg.jp/kosodate/akachan.html"
+        }
+      ]
+    },
+    {
+      "id": "mynumber-card-baby",
+      "title": "子のマイナンバーカード申請（特急発行）",
+      "category": "procedure",
+      "authority": "koto",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 14
+      },
+      "deadline": "soft",
+      "notes": "出生届と同時に特急発行申請が可能。018サポート等の電子申請にも使える。"
+    },
+    {
+      "id": "lump-sum-balance",
+      "title": "出産育児一時金の差額精算確認",
+      "category": "procedure",
+      "authority": "national",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 60
+      },
+      "deadline": "soft",
+      "notes": "出産費用が50万円未満なら差額を健保に請求。時効は出産翌日から2年。産院の領収書・明細書は必ず保管（区の助成申請にも必要になる場合あり）。"
+    },
+    {
+      "id": "childcare-benefit-claim",
+      "title": "育児休業給付金の申請確認（会社経由）",
+      "category": "work",
+      "authority": "employer",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 30
+      },
+      "deadline": "soft",
+      "notes": "通常は会社がハローワークに申請。初回申請時期と必要書類（母子手帳の出生ページ写し等）を人事に確認。出生後休業支援給付金の該当可否もあわせて確認。"
+    },
+    {
+      "id": "company-birth-report",
+      "title": "会社への出生報告・家族手当等の申請",
+      "category": "work",
+      "authority": "employer",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 14
+      },
+      "deadline": "soft",
+      "notes": "扶養手当・出産祝い金等の社内制度の申請期限を人事に確認。"
+    },
+    {
+      "id": "postpartum-care",
+      "title": "産後ケア（宿泊型/デイ）の利用登録・空き確認",
+      "category": "health",
+      "authority": "koto",
+      "trigger": {
+        "type": "beforeDue",
+        "days": 45
+      },
+      "deadline": "soft",
+      "notes": "江東区は宿泊型・日帰り型の産後ケアあり。産前に利用条件と施設を確認しておくと産後すぐ使える。",
+      "links": [
+        {
+          "label": "江東区: 妊娠・出産",
+          "url": "https://www.city.koto.lg.jp/shussan.html"
+        }
+      ]
+    },
+    {
+      "id": "hr-checklist",
+      "title": "人事・健保への事前確認（一括ヒアリング）",
+      "category": "work",
+      "authority": "employer",
+      "trigger": {
+        "type": "beforeDue",
+        "days": 75
+      },
+      "deadline": "soft",
+      "prepTasks": [
+        "産休・育休の社内申請システムと申請期限（法定より早い社内締切の有無）",
+        "育休中の会社独自の給与補償の有無と条件（免責期間・雇用保険給付との関係を確認）",
+        "出生後休業支援給付金（両親とも育休14日以上等で給付上乗せ）の社内運用と申請方法",
+        "健保の出産育児一時金に付加給付があるか（勤務先の健保組合サイトで確認）",
+        "被扶養者追加の申請期限と必要書類",
+        "出産祝い金・出産特別休暇の有無と申請方法",
+        "社会保険料免除（産休・育休中）の申出は会社側が行うことの確認"
+      ],
+      "notes": "1回のヒアリングでまとめて確認し、回答を各タスクのメモ・期限に反映する。社外公開情報は二次情報のため、社内ポータル・健保公式で必ず裏取りする。",
+      "links": [
+        {
+          "label": "健康保険組合連合会（勤務先の健保組合を検索）",
+          "url": "https://www.kenporen.com/"
+        }
+      ]
+    },
+    {
+      "id": "shussan-teatekin",
+      "title": "出産手当金の申請（妻・健保組合）",
+      "category": "work",
+      "authority": "employer",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 60
+      },
+      "deadline": "soft",
+      "notes": "産前42日・産後56日のうち給与が出なかった期間の給付。会社経由申請が一般的。健保給付の時効は2年。申請様式・付加給付の有無は加入している健保組合のサイトで確認（リンクは一般的な制度解説。確認日2026-07-19）。",
+      "links": [
+        {
+          "label": "協会けんぽ: 出産で会社を休んだとき（出産手当金）",
+          "url": "https://www.kyoukaikenpo.or.jp/faq/benefit/007"
+        }
+      ],
+      "conditions": [
+        {
+          "field": "role",
+          "value": "mother-employee"
+        }
+      ]
+    },
+    {
+      "id": "babysitter-support",
+      "title": "ベビーシッター補助・内閣府割引券の利用登録",
+      "category": "work",
+      "authority": "employer",
+      "trigger": {
+        "type": "afterBirth",
+        "days": 60
+      },
+      "deadline": "soft",
+      "notes": "会社独自のベビーシッター利用補助や内閣府ベビーシッター割引券配布の有無・条件を社内ポータルで確認。育児コンシェルジュ等の付帯サービスの登録もあわせて。"
+    },
+    {
+      "id": "cafeteria-plan",
+      "title": "カフェテリアプランの育児・出産メニュー確認",
+      "category": "work",
+      "authority": "employer",
+      "trigger": {
+        "type": "beforeDue",
+        "days": 30
+      },
+      "deadline": "soft",
+      "notes": "健保のカフェテリアポイントを育児用品・サービスに充当できるメニューがあるか確認。赤ちゃんファーストのギフトと重複しない使い道を計画。"
+    },
+    {
+      "id": "nursery-research",
+      "title": "保育園の情報収集開始（見学予約）",
+      "category": "prep",
+      "authority": "koto",
+      "trigger": {
+        "type": "beforeDue",
+        "days": 90
+      },
+      "deadline": "soft",
+      "notes": "江東区は激戦エリアあり。4月入園の申込時期から逆算して見学計画を立てる。"
+    }
+  ]
+}
