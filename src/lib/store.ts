@@ -17,12 +17,12 @@ import purchaseMaster from '../data/purchase-master.json';
 // Web設定値を貼り付ける。これは公開クライアント識別子でありコミット可（CLAUDE.md参照）
 // ─────────────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: 'REPLACE_ME',
-  authDomain: 'REPLACE_ME.firebaseapp.com',
-  projectId: 'REPLACE_ME',
-  storageBucket: 'REPLACE_ME.firebasestorage.app',
-  messagingSenderId: 'REPLACE_ME',
-  appId: 'REPLACE_ME',
+  apiKey: 'AIzaSyD7-R7UOs-lTbE7Ja-NQ1QpU8Vd_Aax7Ao',
+  authDomain: 'yurikago-be00f.firebaseapp.com',
+  projectId: 'yurikago-be00f',
+  storageBucket: 'yurikago-be00f.firebasestorage.app',
+  messagingSenderId: '490063155573',
+  appId: '1:490063155573:web:550672aeeb558060e9433c',
 };
 
 const app = initializeApp(firebaseConfig);
