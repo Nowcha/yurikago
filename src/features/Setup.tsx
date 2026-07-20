@@ -2,6 +2,26 @@ import { useState } from 'react';
 import type { User } from 'firebase/auth';
 import { login, createHousehold } from '../lib/store';
 
+function hasErrorCode(error: unknown): error is { code: string } {
+  return typeof error === 'object' && error !== null && 'code' in error;
+}
+
+/** Firebase Authのエラーコードを画面表示用の日本語メッセージに変換 */
+function describeAuthError(error: unknown): string | null {
+  const code = hasErrorCode(error) ? error.code : undefined;
+  switch (code) {
+    case 'auth/unauthorized-domain':
+      return 'このサイトのドメインがFirebaseで許可されていません。Firebaseコンソール > Authentication > Settings > 承認済みドメイン に追加してください。';
+    case 'auth/popup-blocked':
+      return 'ポップアップがブロックされました。ブラウザの設定でこのサイトのポップアップを許可してください。';
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return null; // 自分でポップアップを閉じただけなのでエラー表示不要
+    default:
+      return 'ログインに失敗しました。もう一度お試しください。';
+  }
+}
+
 /**
  * ログイン → 世帯作成 or パートナーの追加待ち。
  * 参加フロー: 後から入る側はここで自分のIDを相手に伝え、
@@ -14,6 +34,8 @@ export default function Setup({ user }: { user: User | null }) {
   const [copied, setCopied] = useState(false);
   const [bothLeave, setBothLeave] = useState(true);
   const [motherEmployee, setMotherEmployee] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [loggingIn, setLoggingIn] = useState(false);
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-8 bg-base px-6 py-10">
@@ -25,12 +47,30 @@ export default function Setup({ user }: { user: User | null }) {
       </header>
 
       {!user ? (
-        <button
-          onClick={() => login()}
-          className="rounded-full bg-accent py-4 font-display text-lg font-bold text-white border border-ink active:scale-95"
-        >
-          Googleでログイン
-        </button>
+        <div className="space-y-3">
+          <button
+            disabled={loggingIn}
+            onClick={async () => {
+              setAuthError(null);
+              setLoggingIn(true);
+              try {
+                await login();
+              } catch (error: unknown) {
+                setAuthError(describeAuthError(error));
+              } finally {
+                setLoggingIn(false);
+              }
+            }}
+            className="w-full rounded-full bg-accent py-4 font-display text-lg font-bold text-white border border-ink active:scale-95 disabled:opacity-40"
+          >
+            {loggingIn ? 'ログイン中…' : 'Googleでログイン'}
+          </button>
+          {authError && (
+            <p className="rounded-xl bg-alert/10 p-3 text-sm leading-relaxed text-alert">
+              {authError}
+            </p>
+          )}
+        </div>
       ) : (
         <div className="space-y-8">
           <section className="rounded-2xl bg-white p-6 border border-ink/10">
