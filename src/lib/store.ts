@@ -5,7 +5,7 @@ import {
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, query, where, onSnapshot, writeBatch, updateDoc, setDoc,
-  arrayUnion, deleteDoc, orderBy, limit,
+  arrayUnion, deleteDoc, deleteField, orderBy, limit,
 } from 'firebase/firestore';
 import type { Household, HouseholdProfile, TaskInstance, TaskTemplate, PurchaseItem, CareRecord } from '../types';
 import { resolveDueDate } from './deadline';
@@ -156,6 +156,12 @@ export function updateItem(householdId: string, itemId: string, patch: Partial<P
 }
 export function addItem(householdId: string, item: Omit<PurchaseItem, 'id'>) {
   return setDoc(doc(collection(db, 'households', householdId, 'items')), item);
+}
+/** 担当の解除。Firestoreはundefinedを拒否するためdeleteField()でフィールドごと消す */
+export function clearItemAssignee(householdId: string, itemId: string) {
+  return updateDoc(doc(db, 'households', householdId, 'items', itemId), {
+    assignee: deleteField(),
+  });
 }
 
 // ── Backup / Restore / Delete ────────────────────────────────

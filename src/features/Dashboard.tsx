@@ -1,5 +1,9 @@
 import type { Household, TaskInstance, PurchaseItem } from '../types';
 import { pregnancyWeek, daysUntilDue, urgency, todayYmd, diffDays } from '../lib/deadline';
+import {
+  groupTasksByAssignee, categoryProgress, sprintTasks, type AssigneeGroupKey,
+} from '../lib/overview';
+import { CATEGORY_LABEL, assigneeLabel } from '../lib/labels';
 import weeklyInfo from '../data/weekly-info.json';
 
 export default function Dashboard({
@@ -63,6 +67,8 @@ export default function Dashboard({
 
       {!born && <WeekInfoCard week={week} />}
 
+      {born && <SprintSection tasks={tasks} today={today} onGoTasks={onGoTasks} />}
+
       {overdue.length > 0 && (
         <section className="rounded-2xl bg-alert/10 p-4">
           <h2 className="font-display font-bold text-alert">期限を過ぎています</h2>
@@ -84,22 +90,7 @@ export default function Dashboard({
             7日以内の期限はありません。ひと息つきましょう。
           </p>
         ) : (
-          <ul className="mt-3 space-y-2">
-            {imminent.map((t) => (
-              <li key={t.id} className="flex items-center justify-between rounded-2xl bg-white p-4 border border-ink/10">
-                <div>
-                  <p className="font-medium text-ink">{t.title}</p>
-                  <p className="text-xs text-ink/50">
-                    {t.dueDateResolved}まで
-                    {t.deadline === 'hard' && (
-                      <span className="ml-1 rounded bg-alert/10 px-1.5 py-0.5 text-alert">法定</span>
-                    )}
-                  </p>
-                </div>
-                <AssigneeBadge assignee={t.assignee} names={household} />
-              </li>
-            ))}
-          </ul>
+          <AssigneeSections tasks={imminent} household={household} />
         )}
       </section>
 
@@ -119,7 +110,126 @@ export default function Dashboard({
           <p className="text-xs text-ink/50">/ ¥{budget.toLocaleString()}</p>
         </div>
       </section>
+
+      <CategoryProgressCard tasks={tasks} />
     </div>
+  );
+}
+
+const ASSIGNEE_SECTION_ORDER: AssigneeGroupKey[] = ['partner1', 'partner2', 'both', 'none'];
+
+function AssigneeSections({ tasks, household }: {
+  tasks: TaskInstance[]; household: Household;
+}) {
+  const groups = groupTasksByAssignee(tasks);
+  return (
+    <div className="mt-3 space-y-4">
+      {ASSIGNEE_SECTION_ORDER.map((key) => {
+        const list = groups[key];
+        if (list.length === 0) return null;
+        return (
+          <div key={key}>
+            <h3 className="text-xs font-bold tracking-wide text-ink/50">
+              {assigneeLabel(key, household)}
+            </h3>
+            <ul className="mt-1.5 space-y-2">
+              {list.map((t) => (
+                <li key={t.id} className="rounded-2xl bg-white p-4 border border-ink/10">
+                  <p className="font-medium text-ink">{t.title}</p>
+                  <p className="text-xs text-ink/50">
+                    {t.dueDateResolved}まで
+                    {t.deadline === 'hard' && (
+                      <span className="ml-1 rounded bg-alert/10 px-1.5 py-0.5 text-alert">法定</span>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CategoryProgressCard({ tasks }: { tasks: TaskInstance[] }) {
+  const rows = categoryProgress(tasks);
+  if (rows.length === 0) return null;
+  return (
+    <section className="rounded-2xl bg-white p-4 border border-ink/10">
+      <p className="text-xs text-ink/50">カテゴリ別進捗</p>
+      <ul className="mt-3 space-y-2.5">
+        {rows.map((r) => {
+          const pct = r.total > 0 ? Math.round((r.done / r.total) * 100) : 0;
+          return (
+            <li key={r.category}>
+              <div className="flex items-baseline justify-between text-xs">
+                <span className="font-medium text-ink">{CATEGORY_LABEL[r.category]}</span>
+                <span className="text-ink/50">{r.done}/{r.total}</span>
+              </div>
+              <div className="mt-1 h-1.5 rounded-full bg-base">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** 産後2週間スプリント: 出生日確定後、afterBirthタスクを期限順に消し込むビュー */
+function SprintSection({ tasks, today, onGoTasks }: {
+  tasks: TaskInstance[]; today: string; onGoTasks: () => void;
+}) {
+  const sprint = sprintTasks(tasks);
+  if (sprint.length === 0) return null;
+  const remaining = sprint.filter((t) => t.status === 'todo' || t.status === 'doing');
+  return (
+    <section className="rounded-2xl border border-ink bg-white p-5">
+      <div className="flex items-baseline justify-between">
+        <h2 className="font-display font-bold text-ink">産後2週間スプリント</h2>
+        <button onClick={onGoTasks} className="text-sm text-accent">すべて見る →</button>
+      </div>
+      <p className="mt-1 text-xs text-ink/50">
+        のこり {remaining.length} 件。出生届などの法定期限を最優先で。
+      </p>
+      <ul className="mt-3 space-y-2">
+        {sprint.map((t) => {
+          const closed = t.status === 'done' || t.status === 'na';
+          const daysLeft = t.dueDateResolved ? diffDays(today, t.dueDateResolved) : null;
+          return (
+            <li
+              key={t.id}
+              className={`flex items-center justify-between gap-2 rounded-xl border border-ink/10 px-3 py-2.5 ${
+                closed ? 'opacity-45' : ''
+              }`}
+            >
+              <div className="min-w-0">
+                <p className={`truncate text-sm font-medium text-ink ${closed ? 'line-through' : ''}`}>
+                  {t.title}
+                </p>
+                <p className="text-xs text-ink/50">
+                  {t.dueDateResolved ?? '期限未定'}
+                  {t.deadline === 'hard' && (
+                    <span className="ml-1 rounded bg-alert/10 px-1.5 py-0.5 text-alert">法定</span>
+                  )}
+                </p>
+              </div>
+              {!closed && daysLeft != null && (
+                <span
+                  className={`shrink-0 font-display text-sm font-bold ${
+                    daysLeft < 0 ? 'text-alert' : 'text-ink'
+                  }`}
+                >
+                  {daysLeft < 0 ? `${-daysLeft}日超過` : `あと${daysLeft}日`}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -127,14 +237,9 @@ export function AssigneeBadge({
   assignee, names,
 }: { assignee?: 'partner1' | 'partner2' | 'both'; names: Household }) {
   if (!assignee) return null;
-  const [u1, u2] = names.memberUids;
-  const label =
-    assignee === 'both' ? 'ふたり'
-    : assignee === 'partner1' ? names.memberNames[u1] ?? 'メンバー1'
-    : names.memberNames[u2] ?? 'メンバー2';
   return (
     <span className="shrink-0 rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-accent">
-      {label}
+      {assigneeLabel(assignee, names)}
     </span>
   );
 }
