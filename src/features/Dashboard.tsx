@@ -19,7 +19,10 @@ export default function Dashboard({
   const { week, day } = pregnancyWeek(household.dueDate, today);
   const remaining = daysUntilDue(household.dueDate, today);
 
-  const active = tasks.filter((t) => t.status === 'todo' || t.status === 'doing');
+  // 出生後、afterBirthタスクはスプリントビューに表示するため通常リストから除く（二重表示防止）
+  const active = tasks.filter((t) =>
+    (t.status === 'todo' || t.status === 'doing') &&
+    !(born && t.trigger.type === 'afterBirth'));
   const overdue = active.filter((t) => urgency(t.dueDateResolved, today) === 'overdue');
   const imminent = active
     .filter((t) => urgency(t.dueDateResolved, today) === 'imminent')
@@ -219,7 +222,7 @@ function SprintSection({ tasks, today, onGoTasks }: {
               {!closed && daysLeft != null && (
                 <span
                   className={`shrink-0 font-display text-sm font-bold ${
-                    daysLeft < 0 ? 'text-alert' : 'text-ink'
+                    daysLeft < 0 && t.deadline === 'hard' ? 'text-alert' : 'text-ink'
                   }`}
                 >
                   {daysLeft < 0 ? `${-daysLeft}日超過` : `あと${daysLeft}日`}
