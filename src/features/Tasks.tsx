@@ -4,13 +4,7 @@ import { todayYmd, urgency } from '../lib/deadline';
 import { Flag } from 'lucide-react';
 import { updateTask, addTask, removeTask } from '../lib/store';
 import { AssigneeBadge } from './Dashboard';
-
-const CATEGORY_LABEL: Record<string, string> = {
-  procedure: '手続き', purchase: '購入', prep: '準備', health: '健康', work: '会社',
-};
-const AUTHORITY_LABEL: Record<string, string> = {
-  koto: '江東区', tokyo: '東京都', national: '国', employer: '会社', hospital: '産院',
-};
+import { CATEGORY_LABEL, AUTHORITY_LABEL, assigneeLabel } from '../lib/labels';
 
 export default function Tasks({ household, tasks }: { household: Household; tasks: TaskInstance[] }) {
   const [showDone, setShowDone] = useState(false);
@@ -126,9 +120,9 @@ const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: 'na', label: '対象外' },
 ];
 const ASSIGNEE_OPTIONS: { value: Assignee; label: (h: Household) => string }[] = [
-  { value: 'partner1', label: (h) => h.memberNames[h.memberUids[0]] ?? 'メンバー1' },
-  { value: 'partner2', label: (h) => h.memberNames[h.memberUids[1]] ?? 'メンバー2' },
-  { value: 'both', label: () => 'ふたり' },
+  { value: 'partner1', label: (h) => assigneeLabel('partner1', h) },
+  { value: 'partner2', label: (h) => assigneeLabel('partner2', h) },
+  { value: 'both', label: (h) => assigneeLabel('both', h) },
 ];
 
 function TaskSheet({ task, household, onClose }: {

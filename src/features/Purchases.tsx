@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import type { Household, PurchaseItem, PurchaseCategory } from '../types';
-import { updateItem, addItem } from '../lib/store';
+import type { Household, PurchaseItem, PurchaseCategory, Assignee } from '../types';
+import { updateItem, addItem, clearItemAssignee } from '../lib/store';
+import { purchaseAlerts } from '../lib/overview';
+import { assigneeLabel } from '../lib/labels';
+import { todayYmd } from '../lib/deadline';
 
 const CATEGORIES: { id: PurchaseCategory; label: string }[] = [
   { id: 'sleep', label: 'ねんね' },
@@ -19,10 +22,12 @@ export default function Purchases({ household, items }: {
   household: Household; items: PurchaseItem[];
 }) {
   const [newName, setNewName] = useState('');
+  const today = todayYmd();
   const active = items.filter((i) => i.status !== 'skipped');
   const budget = active.reduce((s, i) => s + (i.budget ?? 0), 0);
   const spent = items.filter((i) => i.status === 'done')
     .reduce((s, i) => s + (i.actualCost ?? i.budget ?? 0), 0);
+  const alerts = purchaseAlerts(items, household.dueDate, household.birthDate, today);
 
   return (
     <div className="px-5 pt-8">
@@ -32,6 +37,22 @@ export default function Purchases({ household, items }: {
         <p className="text-sm text-ink/50">/ 予算 ¥{budget.toLocaleString()}</p>
       </div>
 
+      {alerts.length > 0 && (
+        <section className="mt-4 rounded-2xl border border-ink bg-white p-4">
+          <h2 className="font-display text-sm font-bold text-ink">そろそろ準備の時期です</h2>
+          <ul className="mt-2 space-y-1 text-sm text-ink">
+            {alerts.map(({ item, due, urgency: u }) => (
+              <li key={item.id} className="flex items-baseline justify-between gap-2">
+                <span className="truncate">・{item.name}</span>
+                <span className={`shrink-0 text-xs ${u === 'overdue' ? 'font-bold' : 'text-ink/50'}`}>
+                  {due}まで{u === 'overdue' && '（超過）'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {CATEGORIES.map((c) => {
         const list = items.filter((i) => i.category === c.id);
         if (list.length === 0) return null;
@@ -40,7 +61,7 @@ export default function Purchases({ household, items }: {
             <h2 className="text-sm font-bold text-ink/60">{c.label}</h2>
             <ul className="mt-2 space-y-2">
               {list.map((i) => (
-                <ItemRow key={i.id} item={i} householdId={household.id} />
+                <ItemRow key={i.id} item={i} household={household} />
               ))}
             </ul>
           </section>
@@ -72,9 +93,26 @@ export default function Purchases({ household, items }: {
   );
 }
 
-function ItemRow({ item, householdId }: { item: PurchaseItem; householdId: string }) {
+/** 担当のタップ順: 未設定 → partner1 → partner2 → ふたり → 未設定 */
+function nextAssignee(current?: Assignee): Assignee | undefined {
+  switch (current) {
+    case undefined: return 'partner1';
+    case 'partner1': return 'partner2';
+    case 'partner2': return 'both';
+    case 'both': return undefined;
+  }
+}
+
+function ItemRow({ item, household }: { item: PurchaseItem; household: Household }) {
+  const householdId = household.id;
   const done = item.status === 'done';
   const skipped = item.status === 'skipped';
+  const cycleAssignee = () => {
+    const next = nextAssignee(item.assignee);
+    return next
+      ? updateItem(householdId, item.id, { assignee: next })
+      : clearItemAssignee(householdId, item.id);
+  };
   return (
     <li className={`rounded-2xl bg-white p-4 border border-ink/10 ${skipped ? 'opacity-40' : ''}`}>
       <div className="flex items-start gap-3">
@@ -88,11 +126,25 @@ function ItemRow({ item, householdId }: { item: PurchaseItem; householdId: strin
           <p className={`text-sm font-medium text-ink ${done ? 'line-through opacity-60' : ''}`}>
             {item.name}
           </p>
-          <p className="mt-0.5 flex flex-wrap gap-1.5 text-xs text-ink/50">
+          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink/50">
             <span className="rounded bg-base px-1.5 py-0.5">{METHOD_LABEL[item.method]}</span>
             {item.budget != null && <span>予算¥{item.budget.toLocaleString()}</span>}
             {item.waitUntilBorn && (
               <span className="rounded bg-sub/15 px-1.5 py-0.5 text-sub">産後に様子見て</span>
+            )}
+            {!skipped && (
+              <button
+                type="button"
+                onClick={cycleAssignee}
+                aria-label="担当を切り替え"
+                className={`rounded-full px-2 py-0.5 ${
+                  item.assignee
+                    ? 'bg-surface font-medium text-accent'
+                    : 'border border-dashed border-ink/25 text-ink/40'
+                }`}
+              >
+                {item.assignee ? assigneeLabel(item.assignee, household) : '担当'}
+              </button>
             )}
           </p>
           {item.memo && <p className="mt-1 text-xs text-ink/50">{item.memo}</p>}
