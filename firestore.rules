@@ -18,6 +18,11 @@ service cloud.firestore {
         && request.auth.uid in get(/databases/$(database)/documents/households/$(hid)).data.memberUids;
     }
 
+    function isMemberAfter(hid) {
+      return isSignedIn()
+        && request.auth.uid in getAfter(/databases/$(database)/documents/households/$(hid)).data.memberUids;
+    }
+
     match /households/{hid} {
 
       // 作成: 自分自身を含む最大2名のmemberUidsでのみ作成可
@@ -42,9 +47,11 @@ service cloud.firestore {
       allow delete: if isSignedIn()
         && request.auth.uid in resource.data.memberUids;
 
-      // サブコレクション（tasks / items / records）: 世帯メンバーのみ全操作可
+      // サブコレクション（tasks / items / records）: 世帯メンバーのみ全操作可。
+      // createは初回世帯作成バッチ内の親ドキュメントも参照できるようgetAfter()で判定する
       match /{collection}/{docId} {
-        allow read, write: if isMember(hid);
+        allow create: if isMemberAfter(hid);
+        allow read, update, delete: if isMember(hid);
       }
     }
 

@@ -70,7 +70,7 @@ export default function App() {
           <Records household={household} records={records} uid={user.uid} />
         )}
         {tab === 'settings' && (
-          <Settings user={user} household={household} tasks={tasks} items={items} records={records} />
+          <Settings user={user} household={household} tasks={tasks} items={items} />
         )}
       </main>
       <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-ink/10 bg-white/95 backdrop-blur">
