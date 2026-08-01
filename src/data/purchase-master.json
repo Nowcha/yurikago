@@ -1,6 +1,6 @@
 {
-  "version": "0.2",
-  "note": "必要最小限の出産準備リスト。数量・要否は産院・季節・家庭環境に合わせる。waitUntilBorn=trueは『生まれてから様子を見て買う』推奨品。",
+  "version": "0.3",
+  "note": "初回利用で迷わないための必要最小限の出産準備リスト。数量・要否は産院・季節・家庭環境に合わせる。waitUntilBorn=trueは『生まれてから様子を見て買う』推奨品。",
   "items": [
     { "name": "短肌着・コンビ肌着（各5枚目安）", "category": "clothing", "neededBy": { "type": "beforeDue", "days": 30 }, "method": "undecided", "budget": 8000, "status": "todo" },
     { "name": "退院用ウェア（セレモニードレスは任意）", "category": "clothing", "neededBy": { "type": "beforeDue", "days": 21 }, "method": "undecided", "budget": 5000, "status": "todo", "memo": "季節に合う普段着でも十分。記念用の服は家庭の希望で選ぶ" },
@@ -10,7 +10,7 @@
     { "name": "必要なら哺乳瓶・乳首・洗浄消毒用品", "category": "feeding", "neededBy": { "type": "beforeDue", "days": 14 }, "method": "undecided", "budget": 6000, "status": "todo", "memo": "授乳方針と産院の案内を確認してから、最小数量で用意" },
     { "name": "必要なら粉ミルク（小缶1つ）", "category": "feeding", "neededBy": { "type": "beforeDue", "days": 14 }, "method": "undecided", "budget": 2000, "status": "todo", "memo": "産院で使用する銘柄や退院時の案内を確認してから購入" },
     { "name": "新生児用おむつ1パック＋おしりふき", "category": "other", "neededBy": { "type": "beforeDue", "days": 14 }, "method": "buy", "budget": 3000, "status": "todo", "memo": "サイズアウトが早いので買いだめしない" },
-    { "name": "赤ちゃん専用の安全な寝床", "category": "sleep", "neededBy": { "type": "beforeDue", "days": 30 }, "method": "undecided", "budget": 20000, "status": "todo", "memo": "硬く平坦な寝具を選び、寝床に枕・掛け布団・タオル・ぬいぐるみを置かない。ベビーベッドはPSCマークを確認" },
+    { "name": "赤ちゃん専用の安全な寝床", "category": "sleep", "neededBy": { "type": "beforeDue", "days": 30 }, "method": "undecided", "budget": 20000, "status": "todo", "memo": "硬く平坦な寝具を選び、寝床に枕・掛け布団・タオル・ぬいぐるみを置かない。乳幼児用ベッドは子供PSCマークを確認（移行期間中は従来のひし形PSCも可）" },
     { "name": "おくるみ・バスタオル（寝床には置かない）", "category": "sleep", "neededBy": { "type": "beforeDue", "days": 21 }, "method": "undecided", "budget": 4000, "status": "todo", "memo": "睡眠中の顔周りには置かず、用途と使用方法を確認する" },
     { "name": "ベビー用爪切り・綿棒・体温計", "category": "other", "neededBy": { "type": "beforeDue", "days": 14 }, "method": "buy", "budget": 4000, "status": "todo" },
     { "name": "抱っこ紐", "category": "outing", "neededBy": { "type": "afterBirth", "days": 30 }, "method": "undecided", "budget": 25000, "status": "todo", "waitUntilBorn": true, "memo": "体格との相性があるので産後に試着推奨" },
@@ -19,6 +19,8 @@
     { "name": "産褥ショーツ・母乳パッド（ママ用品）", "category": "mom", "neededBy": { "type": "beforeDue", "days": 30 }, "method": "buy", "budget": 5000, "status": "todo" },
     { "name": "円座クッション・授乳クッション", "category": "mom", "neededBy": { "type": "beforeDue", "days": 21 }, "method": "undecided", "budget": 6000, "status": "todo" },
     { "name": "ツーウェイオール・カバーオール（3〜5枚目安）", "category": "clothing", "neededBy": { "type": "beforeDue", "days": 21 }, "method": "buy", "budget": 8000, "status": "todo", "memo": "季節・洗濯頻度に合わせ、買いすぎない" },
-    { "name": "スリーパー（掛け布団の代わり・必要な季節のみ）", "category": "sleep", "neededBy": { "type": "beforeDue", "days": 14 }, "method": "undecided", "budget": 4000, "status": "todo", "memo": "サイズが合い、顔を覆わない製品を選ぶ。室温に応じて衣類で調整" }
+    { "name": "スリーパー（掛け布団の代わり・必要な季節のみ）", "category": "sleep", "neededBy": { "type": "beforeDue", "days": 14 }, "method": "undecided", "budget": 4000, "status": "todo", "memo": "サイズが合い、顔を覆わない製品を選ぶ。室温に応じて衣類で調整" },
+    { "name": "防水マットレスカバー・フィットシーツ（洗い替え）", "category": "sleep", "neededBy": { "type": "beforeDue", "days": 30 }, "method": "undecided", "budget": 6000, "status": "todo", "memo": "寝具にぴったり合い、たるみや隙間ができないサイズを選ぶ。緩いシーツや追加の柔らかい敷物は使わない" },
+    { "name": "おむつ替え用マットまたは専用タオル", "category": "other", "neededBy": { "type": "beforeDue", "days": 14 }, "method": "undecided", "budget": 3000, "status": "todo", "memo": "洗濯または拭き取りやすいものを1枚用意し、寝床には置かない" }
   ]
 }

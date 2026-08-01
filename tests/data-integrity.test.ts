@@ -112,13 +112,16 @@ describe('purchase-master.json: waitUntilBornフラグ', () => {
     );
   });
 
-  it('日常着と安全な寝床の注意が含まれる', () => {
+  it('日常着・寝具・おむつ替え用品と安全上の注意が含まれる', () => {
     const names = items.map((item) => item.name);
     const safeBed = (purchaseMaster.items as { name: string; memo?: string }[])
       .find((item) => item.name === '赤ちゃん専用の安全な寝床');
     expect(names.some((name) => name.includes('カバーオール'))).toBe(true);
+    expect(names.some((name) => name.includes('フィットシーツ'))).toBe(true);
+    expect(names.some((name) => name.includes('おむつ替え用マット'))).toBe(true);
     expect(safeBed?.memo).toContain('硬く平坦');
     expect(safeBed?.memo).toContain('掛け布団');
+    expect(safeBed?.memo).toContain('子供PSC');
   });
 });
 
