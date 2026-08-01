@@ -230,6 +230,105 @@ export function clearItemAssignee(householdId: string, itemId: string) {
   });
 }
 
+export interface MasterSyncResult {
+  addedTasks: number;
+  updatedTasks: number;
+  addedItems: number;
+  updatedItems: number;
+}
+
+/** 最新マスターを既存世帯へ反映。利用者の進捗・担当・実費・メモ・期限上書きは保持する */
+export async function syncMasterData(
+  household: Household,
+  tasks: TaskInstance[],
+  items: PurchaseItem[],
+): Promise<MasterSyncResult> {
+  const existingTasks = new Map(tasks.map((task) => [task.templateId ?? task.id, task]));
+  const existingItems = new Map(items.map((item) => [item.id, item]));
+  const templates = procedureMaster.templates as unknown as TaskTemplate[];
+  const masterItems = purchaseMaster.items as unknown as Omit<PurchaseItem, 'id'>[];
+  const profile = household.profile ?? { bothParentsLeave: true, motherIsEmployee: true };
+  const batch = writeBatch(db);
+  const result: MasterSyncResult = {
+    addedTasks: 0,
+    updatedTasks: 0,
+    addedItems: 0,
+    updatedItems: 0,
+  };
+
+  for (const template of templates) {
+    const ref = doc(db, 'households', household.id, 'tasks', template.id);
+    const current = existingTasks.get(template.id);
+    const applicable = matchesProfile(template.conditions, profile);
+    if (!current) {
+      const instance: Omit<TaskInstance, 'id'> = {
+        templateId: template.id,
+        title: template.title,
+        category: template.category,
+        ...(template.authority ? { authority: template.authority } : {}),
+        trigger: template.trigger,
+        ...(template.deadline ? { deadline: template.deadline } : {}),
+        ...(template.prepTasks
+          ? { prepTasks: template.prepTasks, prepDone: template.prepTasks.map(() => false) }
+          : {}),
+        ...(template.links ? { links: template.links } : {}),
+        ...(template.notes ? { notes: template.notes } : {}),
+        status: applicable ? 'todo' : 'na',
+        dueDateResolved: resolveDueDate(
+          template.trigger,
+          household.dueDate,
+          household.birthDate,
+        ),
+        createdAt: Date.now(),
+      };
+      batch.set(ref, instance);
+      result.addedTasks += 1;
+      continue;
+    }
+
+    const patch: Partial<TaskInstance> = {
+      title: template.title,
+      category: template.category,
+      trigger: template.trigger,
+      dueDateResolved: current.dueDateOverride ?? resolveDueDate(
+        template.trigger,
+        household.dueDate,
+        household.birthDate,
+      ),
+      ...(template.authority ? { authority: template.authority } : {}),
+      ...(template.deadline ? { deadline: template.deadline } : {}),
+      ...(template.prepTasks ? { prepTasks: template.prepTasks } : {}),
+      ...(template.links ? { links: template.links } : {}),
+      ...(template.notes ? { notes: template.notes } : {}),
+    };
+    if (!applicable) patch.status = 'na';
+    else if (current.status === 'na') patch.status = 'todo';
+    batch.set(ref, patch, { merge: true });
+    result.updatedTasks += 1;
+  }
+
+  for (const [index, masterItem] of masterItems.entries()) {
+    const id = `m-${index}`;
+    const ref = doc(db, 'households', household.id, 'items', id);
+    if (!existingItems.has(id)) {
+      batch.set(ref, masterItem);
+      result.addedItems += 1;
+      continue;
+    }
+    batch.set(ref, {
+      name: masterItem.name,
+      ...(masterItem.memo ? { memo: masterItem.memo } : {}),
+      ...(masterItem.waitUntilBorn != null
+        ? { waitUntilBorn: masterItem.waitUntilBorn }
+        : {}),
+    }, { merge: true });
+    result.updatedItems += 1;
+  }
+
+  await batch.commit();
+  return result;
+}
+
 // ── Backup / Restore / Delete ────────────────────────────────
 export interface BackupPayload {
   household: Pick<Household, 'name' | 'dueDate' | 'birthDate' | 'profile'>;

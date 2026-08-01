@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import type { Household, TaskInstance, PurchaseItem } from '../types';
 import {
   addPartner, updateHouseholdSettings, logout, importBackup, deleteHouseholdData, loadAllRecords,
+  syncMasterData,
 } from '../lib/store';
 import { exportIcs, exportJson } from '../lib/exporters';
 
@@ -24,6 +25,7 @@ export default function Settings({ user, household, tasks, items }: {
   );
   const [savingHousehold, setSavingHousehold] = useState(false);
   const [householdError, setHouseholdError] = useState<string | null>(null);
+  const [syncingMaster, setSyncingMaster] = useState(false);
   const solo = household.memberUids.length < 2;
 
   return (
@@ -233,6 +235,30 @@ export default function Settings({ user, household, tasks, items }: {
             </div>
           </div>
         )}
+      </section>
+
+      <section className="rounded-2xl bg-white p-5 border border-ink/10">
+        <h2 className="font-display font-bold text-ink">初期データ</h2>
+        <p className="mt-1 text-xs leading-relaxed text-ink/60">
+          江東区・東京都・国の最新マスターから不足している手続きと準備品を追加し、制度説明を更新します。完了状態・担当・メモ・実費・上書き期限は保持します。
+        </p>
+        <button
+          disabled={syncingMaster}
+          onClick={async () => {
+            setSyncingMaster(true);
+            try {
+              const result = await syncMasterData(household, tasks, items);
+              alert(`初期データを更新しました（手続き ${result.addedTasks}件追加、準備品 ${result.addedItems}件追加）`);
+            } catch {
+              alert('初期データを更新できませんでした');
+            } finally {
+              setSyncingMaster(false);
+            }
+          }}
+          className="mt-3 w-full rounded-full border border-ink/15 py-3 text-sm font-bold text-ink disabled:opacity-40"
+        >
+          {syncingMaster ? '更新中…' : '初期データを最新版に更新'}
+        </button>
       </section>
 
       <section className="rounded-2xl bg-white p-5 border border-ink/10">

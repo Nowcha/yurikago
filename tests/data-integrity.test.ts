@@ -15,6 +15,50 @@ function findTemplate(id: string) {
   return t as unknown as { id: string; trigger: TaskInstance['trigger']; prepTasks?: string[] };
 }
 
+describe('procedure-master.json: 初期ラインナップ', () => {
+  const templates = procedureMaster.templates as {
+    id: string;
+    authority?: string;
+    deadline?: string;
+    links?: { url: string }[];
+  }[];
+
+  it('初回利用に必要な妊娠初期・産後健診・予防接種タスクが揃っている', () => {
+    const ids = templates.map((template) => template.id);
+    expect(ids).toEqual(expect.arrayContaining([
+      'pregnancy-notification',
+      'pregnancy-support-first',
+      'postpartum-checkup-2w',
+      'postpartum-checkup-1m',
+      'newborn-hearing-screening',
+      'infant-checkup-1m',
+      'vaccination-plan',
+      'birth-leave-support-benefit',
+    ]));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('行政制度とhard期限には公式リンクがある', () => {
+    const missing = templates.filter((template) => {
+      const needsOfficialLink = ['koto', 'tokyo', 'national'].includes(template.authority ?? '')
+        || template.deadline === 'hard';
+      return needsOfficialLink && !template.links?.some((link) => link.url.startsWith('https://'));
+    });
+    expect(missing).toEqual([]);
+  });
+
+  it('健保加入は一律5日hardにせず、妊婦支援給付2回目は産後タスクにする', () => {
+    const insurance = findTemplate('health-insurance-dependent') as unknown as {
+      trigger: TaskInstance['trigger'];
+      deadline: string;
+    };
+    const support = findTemplate('ninpu-shien-2nd');
+    expect(insurance.trigger).toEqual({ type: 'afterBirth', days: 14 });
+    expect(insurance.deadline).toBe('soft');
+    expect(support.trigger.type).toBe('afterBirth');
+  });
+});
+
 // 受け入れテストD: 起算日の違いが実データに正しく反映されているか
 describe('procedure-master.json: 産後手続きの起算日', () => {
   it('出生届は出生日を含め14日以内 → 出生日+13日が期限', () => {
@@ -43,6 +87,15 @@ describe('purchase-master.json: waitUntilBornフラグ', () => {
       expect.arrayContaining(['抱っこ紐', 'ベビーカー', '搾乳器']),
     );
   });
+
+  it('日常着と安全な寝床の注意が含まれる', () => {
+    const names = items.map((item) => item.name);
+    const safeBed = (purchaseMaster.items as { name: string; memo?: string }[])
+      .find((item) => item.name === '赤ちゃん専用の安全な寝床');
+    expect(names.some((name) => name.includes('カバーオール'))).toBe(true);
+    expect(safeBed?.memo).toContain('硬く平坦');
+    expect(safeBed?.memo).toContain('掛け布団');
+  });
 });
 
 // 受け入れテストG: 週次情報がダッシュボード表示に必要な範囲を網羅しているか
@@ -63,6 +116,11 @@ describe('weekly-info.json: 週次サマリの網羅性', () => {
       (w) => !w.babySize || !w.babyNote || !w.momNote,
     );
     expect(incomplete).toEqual([]);
+  });
+
+  it('すべての出典に参照URLがある', () => {
+    const sources = weeklyInfo.sources as { label: string; url: string }[];
+    expect(sources.every((source) => source.url.startsWith('https://'))).toBe(true);
   });
 });
 

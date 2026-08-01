@@ -102,7 +102,7 @@ interface TaskInstance extends TaskTemplate {
 - 手動タスクの追加・編集・削除
 
 ### 4.3 手続きマスター
-別ファイル `procedure-master-draft.json` 参照（江東区・東京都・国・会社の約20手続きを収録）。
+`src/data/procedure-master.json` 参照（江東区・東京都・国・会社の35手続きを収録）。
 主要期限:
 - 出生届: 出生日含め14日以内（hard）
 - 児童手当: 出生翌日から15日以内（hard、遅れると遡及されない月が発生）
