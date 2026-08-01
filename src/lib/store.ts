@@ -142,7 +142,10 @@ export async function updateHouseholdSettings(
 
   for (const task of tasks) {
     const patch: Partial<TaskInstance> = {
-      dueDateResolved: resolveDueDate(task.trigger, settings.dueDate, settings.birthDate),
+      dueDateResolved: task.templateId
+        ? task.dueDateOverride
+          ?? resolveDueDate(task.trigger, settings.dueDate, settings.birthDate)
+        : task.dueDateResolved,
     };
     const template = task.templateId ? templates.get(task.templateId) : undefined;
     if (template?.conditions) {
@@ -162,7 +165,8 @@ export async function registerBirth(household: Household, tasks: TaskInstance[],
   for (const t of tasks) {
     if (t.trigger.type === 'afterBirth') {
       batch.update(doc(db, 'households', household.id, 'tasks', t.id), {
-        dueDateResolved: resolveDueDate(t.trigger, household.dueDate, birthDate),
+        dueDateResolved: t.dueDateOverride
+          ?? resolveDueDate(t.trigger, household.dueDate, birthDate),
       });
     }
   }
@@ -177,6 +181,28 @@ export function watchTasks(householdId: string, cb: (tasks: TaskInstance[]) => v
 }
 export function updateTask(householdId: string, taskId: string, patch: Partial<TaskInstance>) {
   return updateDoc(doc(db, 'households', householdId, 'tasks', taskId), patch);
+}
+export function setTaskDueDate(
+  household: Household,
+  task: TaskInstance,
+  dueDate: string | null,
+) {
+  const ref = doc(db, 'households', household.id, 'tasks', task.id);
+  if (!task.templateId) {
+    return updateDoc(ref, { dueDateResolved: dueDate });
+  }
+  if (dueDate) {
+    return updateDoc(ref, { dueDateResolved: dueDate, dueDateOverride: dueDate });
+  }
+  return updateDoc(ref, {
+    dueDateResolved: resolveDueDate(task.trigger, household.dueDate, household.birthDate),
+    dueDateOverride: deleteField(),
+  });
+}
+export function clearTaskAssignee(householdId: string, taskId: string) {
+  return updateDoc(doc(db, 'households', householdId, 'tasks', taskId), {
+    assignee: deleteField(),
+  });
 }
 export function addTask(householdId: string, task: Omit<TaskInstance, 'id'>) {
   return setDoc(doc(collection(db, 'households', householdId, 'tasks')), task);
@@ -289,11 +315,11 @@ export async function loadAllRecords(householdId: string): Promise<CareRecord[]>
   return records.sort((left, right) => right.at - left.at);
 }
 
-/** 画面表示用に直近の記録を購読（新しい順・最大300件） */
+/** 画面表示用に直近の記録を購読（新しい順・約1か月分を想定） */
 export function watchRecords(householdId: string, cb: (records: CareRecord[]) => void) {
   const q = query(
     collection(db, 'households', householdId, 'records'),
-    orderBy('at', 'desc'), limit(300),
+    orderBy('at', 'desc'), limit(1000),
   );
   return onSnapshot(q, (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CareRecord, 'id'>) })));
@@ -304,6 +330,10 @@ export function addRecord(householdId: string, record: Omit<CareRecord, 'id'>) {
 }
 export function updateRecord(householdId: string, id: string, patch: Partial<CareRecord>) {
   return updateDoc(doc(db, 'households', householdId, 'records', id), patch);
+}
+export function replaceRecord(householdId: string, record: CareRecord) {
+  const { id, ...data } = record;
+  return setDoc(doc(db, 'households', householdId, 'records', id), data);
 }
 export function removeRecord(householdId: string, id: string) {
   return deleteDoc(doc(db, 'households', householdId, 'records', id));
