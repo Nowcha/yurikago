@@ -8,7 +8,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
-import { doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, arrayUnion, writeBatch } from 'firebase/firestore';
 
 // Emulator未起動時（npm test 単体実行時）はスイート全体をスキップする
 const hasEmulator = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
@@ -46,6 +46,29 @@ describe.skipIf(!hasEmulator)('households ルール', () => {
     );
   });
 
+  it('世帯本体と配下ドキュメントを同一バッチで初回作成できる', async () => {
+    const alice = env.authenticatedContext('alice').firestore();
+    const batch = writeBatch(alice);
+    batch.set(doc(alice, 'households/h-batch'), { ...base, memberUids: ['alice'] });
+    for (let index = 0; index < 22; index += 1) {
+      batch.set(doc(alice, `households/h-batch/tasks/t${index}`), { title: `task-${index}` });
+    }
+    for (let index = 0; index < 16; index += 1) {
+      batch.set(doc(alice, `households/h-batch/items/i${index}`), { name: `item-${index}` });
+    }
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('初回作成バッチでも別世帯の配下ドキュメントは作成できない', async () => {
+    const alice = env.authenticatedContext('alice').firestore();
+    const batch = writeBatch(alice);
+    batch.set(doc(alice, 'households/h-own'), { ...base, memberUids: ['alice'] });
+    batch.set(doc(alice, 'households/h-other/tasks/t1'), { title: 'task' });
+
+    await assertFails(batch.commit());
+  });
+
   it('メンバーはパートナーを追加できる / 非メンバーは自分を追加できない', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'households/h4'), { ...base, memberUids: ['alice'] });
@@ -76,6 +99,7 @@ describe.skipIf(!hasEmulator)('households ルール', () => {
     const alice = env.authenticatedContext('alice').firestore();
     const bob = env.authenticatedContext('bob').firestore();
     await assertSucceeds(getDoc(doc(alice, 'households/h6/tasks/t1')));
+    await assertSucceeds(setDoc(doc(alice, 'households/h6/tasks/t2'), { title: 'y' }));
     await assertFails(getDoc(doc(bob, 'households/h6/tasks/t1')));
     await assertFails(setDoc(doc(bob, 'households/h6/tasks/t2'), { title: 'y' }));
   });

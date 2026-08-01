@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import type { User } from 'firebase/auth';
-import type { Household, TaskInstance, PurchaseItem, CareRecord } from '../types';
-import { addPartner, registerBirth, logout, importBackup, deleteHouseholdData } from '../lib/store';
+import type { Household, TaskInstance, PurchaseItem } from '../types';
+import {
+  addPartner, registerBirth, logout, importBackup, deleteHouseholdData, loadAllRecords,
+} from '../lib/store';
 import { exportIcs, exportJson } from '../lib/exporters';
 
-export default function Settings({ user, household, tasks, items, records }: {
+export default function Settings({ user, household, tasks, items }: {
   user: User; household: Household; tasks: TaskInstance[]; items: PurchaseItem[];
-  records: CareRecord[];
 }) {
   const [partnerUid, setPartnerUid] = useState('');
   const [partnerName, setPartnerName] = useState('');
@@ -116,7 +117,14 @@ export default function Settings({ user, household, tasks, items, records }: {
             法定期限をカレンダーに登録（.ics）
           </button>
           <button
-            onClick={() => exportJson(household, tasks, items, records)}
+            onClick={async () => {
+              try {
+                const allRecords = await loadAllRecords(household.id);
+                exportJson(household, tasks, items, allRecords);
+              } catch {
+                alert('バックアップデータを取得できませんでした');
+              }
+            }}
             className="w-full rounded-full bg-surface py-3 text-sm font-bold text-accent"
           >
             全データをバックアップ（.json）
@@ -160,7 +168,11 @@ export default function Settings({ user, household, tasks, items, records }: {
           onClick={async () => {
             if (!confirm('世帯のすべてのデータ（タスク・準備品・記録）を削除します。元に戻せません。よろしいですか？')) return;
             if (!confirm('本当に削除しますか？事前にバックアップ（.json）を取ることをおすすめします。')) return;
-            await deleteHouseholdData(household.id, tasks, items, records);
+            try {
+              await deleteHouseholdData(household.id, tasks, items);
+            } catch {
+              alert('世帯データを削除できませんでした');
+            }
           }}
           className="mt-3 w-full rounded-full border border-alert/40 py-3 text-sm font-bold text-alert"
         >

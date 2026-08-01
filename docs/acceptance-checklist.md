@@ -5,7 +5,7 @@
 
 ## A. 自動テスト
 - [x] `npm test` → deadline計算・データ整合性・overview集計ロジック 全ケースPASS（tests/deadline.test.ts, tests/data-integrity.test.ts, tests/overview.test.ts）
-- [ ] `npm run test:rules` → ルール 全ケースPASS（Java必要。失敗時はEmulator未起動を疑う）
+- [x] `npm run test:rules` → ルール 全ケースPASS（Java必要。GitHub Pagesデプロイ前にもCIで必須実行）
 - [x] `npm run build` → 型エラーなくビルド完了
 
 以下、各項目に **[自動]**（tests/data-integrity.test.ts等で検証済み・再確認不要）と

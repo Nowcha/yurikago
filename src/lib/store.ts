@@ -5,12 +5,13 @@ import {
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, query, where, onSnapshot, writeBatch, updateDoc, setDoc,
-  arrayUnion, deleteDoc, deleteField, orderBy, limit,
+  arrayUnion, deleteDoc, deleteField, orderBy, limit, getDocs, documentId, startAfter,
 } from 'firebase/firestore';
 import type { Household, HouseholdProfile, TaskInstance, TaskTemplate, PurchaseItem, CareRecord } from '../types';
 import { resolveDueDate } from './deadline';
 import procedureMaster from '../data/procedure-master.json';
 import purchaseMaster from '../data/purchase-master.json';
+import { collectAllPages } from './pagination';
 
 // ─────────────────────────────────────────────────────────────
 // TODO(セットアップ): Firebaseコンソールの「プロジェクトの設定 > マイアプリ」から
@@ -206,8 +207,9 @@ export async function importBackup(householdId: string, payload: BackupPayload) 
 
 /** 世帯データ全削除（サブコレクション→本体の順） */
 export async function deleteHouseholdData(
-  householdId: string, tasks: TaskInstance[], items: PurchaseItem[], records: CareRecord[] = [],
-) {
+  householdId: string, tasks: TaskInstance[], items: PurchaseItem[],
+): Promise<void> {
+  const records = await loadAllRecords(householdId);
   const ops: ((b: ReturnType<typeof writeBatch>) => void)[] = [];
   for (const t of tasks) ops.push((b) => b.delete(doc(db, 'households', householdId, 'tasks', t.id)));
   for (const i of items) ops.push((b) => b.delete(doc(db, 'households', householdId, 'items', i.id)));
@@ -217,7 +219,38 @@ export async function deleteHouseholdData(
 }
 
 // ── Care records（Phase 3: 育児記録） ────────────────────────
-/** 直近の記録を購読（新しい順・最大300件。分析用の全量はJSONエクスポートで取得） */
+const RECORDS_PAGE_SIZE = 300;
+
+/** バックアップ・全削除用に記録をページ分割して全件取得 */
+export async function loadAllRecords(householdId: string): Promise<CareRecord[]> {
+  const recordsRef = collection(db, 'households', householdId, 'records');
+  const records = await collectAllPages<CareRecord>(async (cursor) => {
+    const pageQuery = cursor === null
+      ? query(recordsRef, orderBy(documentId()), limit(RECORDS_PAGE_SIZE))
+      : query(
+          recordsRef,
+          orderBy(documentId()),
+          startAfter(cursor),
+          limit(RECORDS_PAGE_SIZE),
+        );
+    const snapshot = await getDocs(pageQuery);
+    const lastDocument = snapshot.docs.at(-1);
+
+    return {
+      values: snapshot.docs.map((record) => ({
+        id: record.id,
+        ...(record.data() as Omit<CareRecord, 'id'>),
+      })),
+      nextCursor: snapshot.size === RECORDS_PAGE_SIZE && lastDocument
+        ? lastDocument.id
+        : null,
+    };
+  });
+
+  return records.sort((left, right) => right.at - left.at);
+}
+
+/** 画面表示用に直近の記録を購読（新しい順・最大300件） */
 export function watchRecords(householdId: string, cb: (records: CareRecord[]) => void) {
   const q = query(
     collection(db, 'households', householdId, 'records'),
