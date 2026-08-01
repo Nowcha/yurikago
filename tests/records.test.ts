@@ -22,7 +22,10 @@ describe('summarizeCareDay', () => {
 
     expect(summarizeCareDay(records)).toEqual({
       feedingCount: 4,
+      breastMinutes: 0,
       formulaMl: 140,
+      pumpMl: 40,
+      sleepMinutes: 0,
       peeCount: 2,
       poopCount: 1,
     });
@@ -31,7 +34,10 @@ describe('summarizeCareDay', () => {
   it('記録がない日はすべて0を返す', () => {
     expect(summarizeCareDay([])).toEqual({
       feedingCount: 0,
+      breastMinutes: 0,
       formulaMl: 0,
+      pumpMl: 0,
+      sleepMinutes: 0,
       peeCount: 0,
       poopCount: 0,
     });
@@ -44,6 +50,46 @@ describe('summarizeCareDay', () => {
       record('3', 'formula', 50),
     ];
     expect(summarizeCareDay(records).formulaMl).toBe(50);
+  });
+
+  it('母乳の授乳時間と搾乳量を集計する', () => {
+    const records: CareRecord[] = [
+      { id: '1', type: 'breast_l', at: 1, durationMin: 12 },
+      { id: '2', type: 'breast_r', at: 2, durationMin: 8 },
+      { id: '3', type: 'pump', at: 3, amountMl: 45 },
+      { id: '4', type: 'pump', at: 4, amountMl: -10 },
+    ];
+    const summary = summarizeCareDay(records);
+    expect(summary.breastMinutes).toBe(20);
+    expect(summary.pumpMl).toBe(45);
+  });
+
+  it('前日から続く睡眠を日付境界で切って集計する', () => {
+    const minute = 60_000;
+    const startAt = 1_000_000_000;
+    const endAt = startAt + (24 * 60 * minute);
+    const records: CareRecord[] = [
+      { id: '1', type: 'sleep', at: startAt - (30 * minute) },
+      { id: '2', type: 'wake', at: startAt + (30 * minute) },
+      { id: '3', type: 'sleep', at: startAt + (60 * minute) },
+      { id: '4', type: 'wake', at: startAt + (120 * minute) },
+    ];
+    expect(summarizeCareDay(records, { startAt, endAt }).sleepMinutes).toBe(90);
+  });
+
+  it('継続中の睡眠は現在時刻までを集計する', () => {
+    const minute = 60_000;
+    const startAt = 2_000_000_000;
+    const endAt = startAt + (24 * 60 * minute);
+    const records: CareRecord[] = [
+      { id: '1', type: 'sleep', at: startAt + (10 * minute) },
+    ];
+    const summary = summarizeCareDay(records, {
+      startAt,
+      endAt,
+      nowAt: startAt + (70 * minute),
+    });
+    expect(summary.sleepMinutes).toBe(60);
   });
 });
 

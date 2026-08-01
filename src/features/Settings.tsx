@@ -1,15 +1,24 @@
 import { useState } from 'react';
 import type { User } from 'firebase/auth';
-import type { Household, TaskInstance, PurchaseItem } from '../types';
+import type { Household, MotherInsurance, TaskInstance, PurchaseItem } from '../types';
 import {
   addPartner, updateHouseholdSettings, logout, importBackup, deleteHouseholdData, loadAllRecords,
   syncMasterData,
 } from '../lib/store';
 import { exportIcs, exportJson } from '../lib/exporters';
+import { normalizeHouseholdProfile } from '../lib/profile';
+
+const INSURANCE_LABELS: Record<MotherInsurance, string> = {
+  employee: '会社員・公務員の健康保険',
+  national: '国民健康保険・国民年金',
+  dependent: '家族の健康保険の扶養',
+  other: 'その他・未確認',
+};
 
 export default function Settings({ user, household, tasks, items }: {
   user: User; household: Household; tasks: TaskInstance[]; items: PurchaseItem[];
 }) {
+  const normalizedProfile = normalizeHouseholdProfile(household.profile);
   const [partnerUid, setPartnerUid] = useState('');
   const [partnerName, setPartnerName] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -17,11 +26,14 @@ export default function Settings({ user, household, tasks, items }: {
   const [editingHousehold, setEditingHousehold] = useState(false);
   const [householdName, setHouseholdName] = useState(household.name);
   const [dueDate, setDueDate] = useState(household.dueDate);
-  const [bothParentsLeave, setBothParentsLeave] = useState(
-    household.profile?.bothParentsLeave ?? true,
+  const [motherTakesLeave, setMotherTakesLeave] = useState(
+    normalizedProfile.motherTakesLeave,
   );
-  const [motherIsEmployee, setMotherIsEmployee] = useState(
-    household.profile?.motherIsEmployee ?? true,
+  const [partnerTakesLeave, setPartnerTakesLeave] = useState(
+    normalizedProfile.partnerTakesLeave,
+  );
+  const [motherInsurance, setMotherInsurance] = useState<MotherInsurance>(
+    normalizedProfile.motherInsurance,
   );
   const [savingHousehold, setSavingHousehold] = useState(false);
   const [householdError, setHouseholdError] = useState<string | null>(null);
@@ -40,15 +52,18 @@ export default function Settings({ user, household, tasks, items }: {
               {household.name} ／ 予定日 {household.dueDate}
             </p>
             <p className="mt-1 text-xs text-ink/50">
-              夫婦とも育休: {household.profile?.bothParentsLeave ? '予定あり' : '予定なし'} ／
-              出産する側の出産手当金: {household.profile?.motherIsEmployee ? '対象候補' : '対象外'}
+              出産する側の育休: {normalizedProfile.motherTakesLeave ? '予定あり' : '予定なし'} ／
+              パートナーの育休: {normalizedProfile.partnerTakesLeave ? '予定あり' : '予定なし'}
+              <br />
+              保険区分: {INSURANCE_LABELS[normalizedProfile.motherInsurance]}
             </p>
             <button
               onClick={() => {
                 setHouseholdName(household.name);
                 setDueDate(household.dueDate);
-                setBothParentsLeave(household.profile?.bothParentsLeave ?? true);
-                setMotherIsEmployee(household.profile?.motherIsEmployee ?? true);
+                setMotherTakesLeave(normalizedProfile.motherTakesLeave);
+                setPartnerTakesLeave(normalizedProfile.partnerTakesLeave);
+                setMotherInsurance(normalizedProfile.motherInsurance);
                 setHouseholdError(null);
                 setEditingHousehold(true);
               }}
@@ -79,18 +94,30 @@ export default function Settings({ user, household, tasks, items }: {
             <label className="flex items-center gap-2 text-sm text-ink/80">
               <input
                 type="checkbox"
-                checked={bothParentsLeave}
-                onChange={(event) => setBothParentsLeave(event.target.checked)}
+                checked={motherTakesLeave}
+                onChange={(event) => setMotherTakesLeave(event.target.checked)}
               />
-              夫婦とも育休を取得する予定
+              出産する側が育休を取得する予定
             </label>
             <label className="flex items-center gap-2 text-sm text-ink/80">
               <input
                 type="checkbox"
-                checked={motherIsEmployee}
-                onChange={(event) => setMotherIsEmployee(event.target.checked)}
+                checked={partnerTakesLeave}
+                onChange={(event) => setPartnerTakesLeave(event.target.checked)}
               />
-              出産する側が会社員・公務員（出産手当金の対象）
+              パートナーが育休を取得する予定
+            </label>
+            <label className="block text-sm text-ink/70">
+              出産する側の保険区分
+              <select
+                value={motherInsurance}
+                onChange={(event) => setMotherInsurance(event.target.value as MotherInsurance)}
+                className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5"
+              >
+                {Object.entries(INSURANCE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
             </label>
             <p className="text-xs leading-relaxed text-ink/50">
               予定日を変更すると期限を再計算します。対象条件が変わった手続きは「対象外」または「未着手」に更新します。
@@ -114,7 +141,7 @@ export default function Settings({ user, household, tasks, items }: {
                       name: householdName.trim(),
                       dueDate,
                       birthDate: household.birthDate ?? null,
-                      profile: { bothParentsLeave, motherIsEmployee },
+                      profile: { motherTakesLeave, partnerTakesLeave, motherInsurance },
                     });
                     setEditingHousehold(false);
                   } catch {
@@ -214,10 +241,7 @@ export default function Settings({ user, household, tasks, items }: {
                       name: household.name,
                       dueDate: household.dueDate,
                       birthDate,
-                      profile: household.profile ?? {
-                        bothParentsLeave: true,
-                        motherIsEmployee: true,
-                      },
+                      profile: normalizedProfile,
                     });
                     setBirthDate('');
                     setConfirmBirth(false);

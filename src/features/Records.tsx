@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Heart, Milk, Droplets, Droplet, Baby, Moon, Sun, Bath, Thermometer, Scale,
-  StickyNote, X, Pencil, ChevronLeft, ChevronRight, type LucideIcon,
+  StickyNote, Pill, Syringe, X, Pencil, ChevronLeft, ChevronRight, type LucideIcon,
 } from 'lucide-react';
 import type { Household, CareRecord, CareRecordType } from '../types';
 import { addRecord, removeRecord, replaceRecord, watchRecordsForDay } from '../lib/store';
-import { parsePositiveMeasurement, summarizeCareDay } from '../lib/records';
+import {
+  parsePositiveMeasurement, summarizeCareDay, type CareDayWindow,
+} from '../lib/records';
 import { addDays, todayYmd } from '../lib/deadline';
 
 const TYPE_META: Record<CareRecordType, { label: string; needsValue?: 'ml' | 'temp' | 'weight' | 'text' }> = {
@@ -20,6 +22,8 @@ const TYPE_META: Record<CareRecordType, { label: string; needsValue?: 'ml' | 'te
   bath: { label: '沐浴' },
   temp: { label: '体温', needsValue: 'temp' },
   weight: { label: '体重', needsValue: 'weight' },
+  medicine: { label: '服薬', needsValue: 'text' },
+  vaccine: { label: '予防接種', needsValue: 'text' },
   memo: { label: 'メモ', needsValue: 'text' },
 };
 
@@ -31,6 +35,7 @@ export default function Records({ household, records, uid }: {
   const [pending, setPending] = useState<CareRecordType | null>(null);
   const [selectedDay, setSelectedDay] = useState(todayYmd());
   const [dayRecords, setDayRecords] = useState<CareRecord[]>([]);
+  const [dayContextRecords, setDayContextRecords] = useState<CareRecord[]>([]);
   const [dayLoading, setDayLoading] = useState(true);
   const [dayError, setDayError] = useState(false);
   const [recordError, setRecordError] = useState<string | null>(null);
@@ -47,11 +52,14 @@ export default function Records({ household, records, uid }: {
       household.id,
       selectedDay,
       (nextRecords) => {
-        setDayRecords(nextRecords);
+        const { startAt, endAt } = careDayWindow(selectedDay);
+        setDayContextRecords(nextRecords);
+        setDayRecords(nextRecords.filter((record) => record.at >= startAt && record.at < endAt));
         setDayLoading(false);
       },
       () => {
         setDayRecords([]);
+        setDayContextRecords([]);
         setDayError(true);
         setDayLoading(false);
       },
@@ -126,6 +134,8 @@ export default function Records({ household, records, uid }: {
         <QuickBtn icon={Bath} label="沐浴" onTap={() => quickAdd('bath')} />
         <QuickBtn icon={Thermometer} label="体温" onTap={() => quickAdd('temp')} />
         <QuickBtn icon={Scale} label="体重" onTap={() => quickAdd('weight')} />
+        <QuickBtn icon={Pill} label="服薬" onTap={() => quickAdd('medicine')} />
+        <QuickBtn icon={Syringe} label="予防接種" onTap={() => quickAdd('vaccine')} />
         <QuickBtn icon={StickyNote} label="メモ" onTap={() => quickAdd('memo')} />
       </div>
       {recordError && <p className="mt-3 text-sm text-alert">{recordError}</p>}
@@ -161,6 +171,7 @@ export default function Records({ household, records, uid }: {
       <DayLog
         household={household}
         records={dayRecords}
+        contextRecords={dayContextRecords}
         selectedDay={selectedDay}
         loading={dayLoading}
         hasError={dayError}
@@ -198,9 +209,10 @@ function QuickBtn({ icon: Icon, label, onTap, emph }: {
   );
 }
 
-function DayLog({ household, records, selectedDay, loading, hasError }: {
+function DayLog({ household, records, contextRecords, selectedDay, loading, hasError }: {
   household: Household;
   records: CareRecord[];
+  contextRecords: CareRecord[];
   selectedDay: string;
   loading: boolean;
   hasError: boolean;
@@ -211,7 +223,9 @@ function DayLog({ household, records, selectedDay, loading, hasError }: {
   return (
     <section className="mt-7">
       <h2 className="text-sm font-bold text-sub">{heading}（{records.length}件）</h2>
-      {!loading && !hasError && records.length > 0 && <DaySummary records={records} />}
+      {!loading && !hasError && (
+        <DaySummary records={contextRecords} selectedDay={selectedDay} />
+      )}
       <ul className="mt-2 divide-y divide-ink/10 rounded-2xl border border-ink/10 bg-white">
         {loading && <li className="p-4 text-sm text-sub">読み込み中…</li>}
         {!loading && hasError && (
@@ -227,6 +241,7 @@ function DayLog({ household, records, selectedDay, loading, hasError }: {
               <span className="text-sm font-medium text-ink">{TYPE_META[r.type].label}</span>
               <span className="text-xs text-sub">
                 {r.amountMl != null && `${r.amountMl}ml`}
+                {r.durationMin != null && `${r.durationMin}分`}
                 {r.temperature != null && `${r.temperature.toFixed(1)}℃`}
                 {r.weightG != null && `${r.weightG}g`}
                 {r.note}
@@ -270,18 +285,20 @@ function DayLog({ household, records, selectedDay, loading, hasError }: {
   );
 }
 
-function DaySummary({ records }: { records: CareRecord[] }) {
-  const summary = summarizeCareDay(records);
+function DaySummary({ records, selectedDay }: { records: CareRecord[]; selectedDay: string }) {
+  const summary = summarizeCareDay(records, careDayWindow(selectedDay));
   const rows = [
-    ['授乳記録', `${summary.feedingCount}回`],
+    ['授乳', `${summary.feedingCount}回 / ${summary.breastMinutes}分`],
     ['ミルク', `${summary.formulaMl}ml`],
+    ['搾乳', `${summary.pumpMl}ml`],
+    ['睡眠', formatMinutes(summary.sleepMinutes)],
     ['おしっこ', `${summary.peeCount}回`],
     ['うんち', `${summary.poopCount}回`],
   ];
   return (
-    <dl className="mt-2 grid grid-cols-4 divide-x divide-ink/10 rounded-xl border border-ink/10 bg-white py-3 text-center">
+    <dl className="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-ink/10 bg-ink/10 text-center">
       {rows.map(([label, value]) => (
-        <div key={label} className="min-w-0 px-1">
+        <div key={label} className="min-w-0 bg-white px-1 py-3">
           <dt className="truncate text-[10px] text-ink/45">{label}</dt>
           <dd className="mt-0.5 font-display text-sm font-bold text-ink">{value}</dd>
         </div>
@@ -298,6 +315,9 @@ function RecordEditSheet({ record, householdId, onClose }: {
   const [type, setType] = useState<CareRecordType>(record.type);
   const [at, setAt] = useState(toDateTimeLocal(record.at));
   const [value, setValue] = useState(recordValue(record));
+  const [duration, setDuration] = useState(
+    record.durationMin == null ? '' : String(record.durationMin),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const kind = TYPE_META[type].needsValue;
@@ -307,8 +327,14 @@ function RecordEditSheet({ record, householdId, onClose }: {
     const timestamp = new Date(at).getTime();
     if (!Number.isFinite(timestamp)) return;
     const measurement = kind && kind !== 'text' ? parsePositiveMeasurement(value) : null;
+    const isBreastfeeding = type === 'breast_l' || type === 'breast_r';
+    const durationMinutes = duration.trim() ? parsePositiveMeasurement(duration) : null;
     if (kind && kind !== 'text' && measurement == null) {
       setError('0より大きい数値を入力してください。');
+      return;
+    }
+    if (isBreastfeeding && duration.trim() && durationMinutes == null) {
+      setError('授乳時間は0より大きい数値を入力してください。');
       return;
     }
     const next: CareRecord = { id: record.id, type, at: timestamp };
@@ -317,6 +343,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
     else if (kind === 'temp' && measurement != null) next.temperature = measurement;
     else if (kind === 'weight' && measurement != null) next.weightG = measurement;
     else if (kind === 'text') next.note = value.trim();
+    if (isBreastfeeding && durationMinutes != null) next.durationMin = durationMinutes;
 
     setSaving(true);
     setError(null);
@@ -345,6 +372,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
             onChange={(event) => {
               setType(event.target.value as CareRecordType);
               setValue('');
+              setDuration('');
             }}
             className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-4 py-3 text-sm font-normal text-ink"
           >
@@ -371,6 +399,19 @@ function RecordEditSheet({ record, householdId, onClose }: {
               min={kind === 'text' ? undefined : '0.1'}
               value={value}
               onChange={(event) => setValue(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-4 py-3 text-sm font-normal text-ink"
+            />
+          </label>
+        )}
+        {(type === 'breast_l' || type === 'breast_r') && (
+          <label className="mt-3 block text-xs font-bold text-ink/50">
+            授乳時間（分・任意）
+            <input
+              type="number"
+              inputMode="decimal"
+              min="0.1"
+              value={duration}
+              onChange={(event) => setDuration(event.target.value)}
               className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-4 py-3 text-sm font-normal text-ink"
             />
           </label>
@@ -465,6 +506,19 @@ function ValueSheet({ type, onSave, onClose }: {
 function hhmm(ms: number): string {
   const d = new Date(ms);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function careDayWindow(day: string): CareDayWindow {
+  const startAt = new Date(`${day}T00:00:00`).getTime();
+  const endDate = new Date(startAt);
+  endDate.setDate(endDate.getDate() + 1);
+  return { startAt, endAt: endDate.getTime(), nowAt: Date.now() };
+}
+
+function formatMinutes(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours > 0 ? `${hours}時間${remainder}分` : `${remainder}分`;
 }
 
 function toDateTimeLocal(ms: number): string {

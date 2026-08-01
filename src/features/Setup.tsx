@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { User } from 'firebase/auth';
+import type { MotherInsurance } from '../types';
 import { login, createHousehold } from '../lib/store';
 
 function hasErrorCode(error: unknown): error is { code: string } {
@@ -32,8 +33,9 @@ export default function Setup({ user }: { user: User | null }) {
   const [name, setName] = useState('わが家');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [bothLeave, setBothLeave] = useState(true);
-  const [motherEmployee, setMotherEmployee] = useState(true);
+  const [motherTakesLeave, setMotherTakesLeave] = useState(true);
+  const [partnerTakesLeave, setPartnerTakesLeave] = useState(true);
+  const [motherInsurance, setMotherInsurance] = useState<MotherInsurance>('employee');
   const [authError, setAuthError] = useState<string | null>(null);
   const [loggingIn, setLoggingIn] = useState(false);
 
@@ -94,12 +96,33 @@ export default function Setup({ user }: { user: User | null }) {
             </label>
             <div className="mt-4 space-y-2 rounded-xl bg-base p-3 text-sm text-ink/80">
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={bothLeave} onChange={(e) => setBothLeave(e.target.checked)} />
-                夫婦とも育休を取得する予定
+                <input
+                  type="checkbox"
+                  checked={motherTakesLeave}
+                  onChange={(e) => setMotherTakesLeave(e.target.checked)}
+                />
+                出産する側が育休を取得する予定
               </label>
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={motherEmployee} onChange={(e) => setMotherEmployee(e.target.checked)} />
-                出産する側が会社員・公務員（出産手当金の対象）
+                <input
+                  type="checkbox"
+                  checked={partnerTakesLeave}
+                  onChange={(e) => setPartnerTakesLeave(e.target.checked)}
+                />
+                パートナーが育休を取得する予定
+              </label>
+              <label className="block pt-1 text-xs font-bold text-ink/50">
+                出産する側の保険区分
+                <select
+                  value={motherInsurance}
+                  onChange={(e) => setMotherInsurance(e.target.value as MotherInsurance)}
+                  className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5 text-sm font-normal text-ink"
+                >
+                  <option value="employee">会社員・公務員（健康保険・厚生年金）</option>
+                  <option value="national">自営業等（国民健康保険・国民年金第1号）</option>
+                  <option value="dependent">家族の健康保険の扶養・国民年金第3号</option>
+                  <option value="other">その他・確認中</option>
+                </select>
               </label>
               <p className="text-xs text-ink/50">
                 当てはまらない手続きは「対象外」として生成されます（あとから変更できます）
@@ -111,8 +134,9 @@ export default function Setup({ user }: { user: User | null }) {
                 setBusy(true);
                 try {
                   await createHousehold(user.uid, user.displayName ?? '名前未設定', name, dueDate, {
-                    bothParentsLeave: bothLeave,
-                    motherIsEmployee: motherEmployee,
+                    motherTakesLeave,
+                    partnerTakesLeave,
+                    motherInsurance,
                   });
                 } finally {
                   setBusy(false);
@@ -123,7 +147,7 @@ export default function Setup({ user }: { user: User | null }) {
               {busy ? '作成中…' : '世帯をつくってタスクを生成する'}
             </button>
             <p className="mt-2 text-xs text-ink/50">
-              江東区・東京都・国・会社の手続き35件と準備品リストが自動で並びます
+              江東区・東京都・国・会社の手続き40件と準備品リストが自動で並びます
             </p>
           </section>
 

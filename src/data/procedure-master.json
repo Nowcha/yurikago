@@ -1,5 +1,5 @@
 {
-  "version": "0.2",
+  "version": "0.3",
   "note": "2026-08-01時点の江東区・東京都・国の公式情報に基づく。会社・健保固有の期限や必要書類は勤務先の一次情報で確認する。",
   "templates": [
     {
@@ -107,7 +107,7 @@
         }
       ],
       "conditions": [
-        { "field": "hasChildcareLeave", "value": true }
+        { "field": "partnerTakesLeave", "value": true }
       ]
     },
     {
@@ -144,6 +144,9 @@
           "label": "厚生労働省: 産前・産後休業を取るときは",
           "url": "https://www.bosei-navi.mhlw.go.jp/ninshin/sanzen_sango.html"
         }
+      ],
+      "conditions": [
+        { "field": "role", "value": "mother-employee" }
       ]
     },
     {
@@ -165,7 +168,7 @@
       ],
       "conditions": [
         {
-          "field": "hasChildcareLeave",
+          "field": "eitherParentTakesLeave",
           "value": true
         }
       ]
@@ -398,6 +401,9 @@
           "label": "厚生労働省: 育児休業等給付",
           "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000135090_00001.html"
         }
+      ],
+      "conditions": [
+        { "field": "eitherParentTakesLeave", "value": true }
       ]
     },
     {
@@ -628,7 +634,88 @@
         }
       ],
       "conditions": [
-        { "field": "hasChildcareLeave", "value": true }
+        { "field": "eitherParentTakesLeave", "value": true }
+      ]
+    },
+    {
+      "id": "national-health-insurance-maternity-exemption",
+      "title": "産前産後期間の国民健康保険料免除を申請",
+      "category": "procedure",
+      "authority": "koto",
+      "trigger": { "type": "beforeDue", "days": 120 },
+      "deadline": "soft",
+      "notes": "出産する本人が江東区の国民健康保険に加入している場合が対象。単胎は出産予定月の前月から4か月間、多胎は3か月前から6か月間が免除される。出産予定日の6か月前から届出でき、出産後も届出可能。",
+      "links": [
+        {
+          "label": "江東区: 産前産後期間にかかる国民健康保険料の免除",
+          "url": "https://www.city.koto.lg.jp/250102/kokuhosanzensango.html"
+        }
+      ],
+      "conditions": [
+        { "field": "motherInsurance", "value": "national" }
+      ]
+    },
+    {
+      "id": "national-pension-maternity-exemption",
+      "title": "産前産後期間の国民年金保険料免除を申請",
+      "category": "procedure",
+      "authority": "national",
+      "trigger": { "type": "beforeDue", "days": 120 },
+      "deadline": "soft",
+      "notes": "国民年金第1号被保険者が対象。単胎は出産予定月の前月から4か月間、多胎は3か月前から6か月間が免除され、免除期間も保険料を納付したものとして将来の年金額に反映される。",
+      "links": [
+        {
+          "label": "日本年金機構: 国民年金保険料の産前産後期間の免除制度",
+          "url": "https://www.nenkin.go.jp/section/faq/kokunen/seido/hokenryo/menjo/sanzensango.html"
+        }
+      ],
+      "conditions": [
+        { "field": "motherInsurance", "value": "national" }
+      ]
+    },
+    {
+      "id": "infant-checkup-4m",
+      "title": "4か月児健康診査を受診",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "afterBirth", "days": 120 },
+      "deadline": "soft",
+      "notes": "4か月になる前の月を目安に案内が届く通知制。指定された保健相談所の日程と持ち物を確認する。",
+      "links": [
+        {
+          "label": "江東区: 4か月児健康診査",
+          "url": "https://www.city.koto.lg.jp/261001/kodomo/iryo/kenko/103479.html"
+        }
+      ]
+    },
+    {
+      "id": "infant-checkup-6-7m",
+      "title": "6〜7か月児健康診査を受診",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "afterBirth", "days": 210 },
+      "deadline": "soft",
+      "notes": "4か月児健康診査の案内に同封される受診票を使い、東京都内の契約医療機関で受診する。受診期限と予約方法を医療機関へ確認する。",
+      "links": [
+        {
+          "label": "江東区: 6〜7か月児、9〜10か月児健康診査",
+          "url": "https://www.city.koto.lg.jp/260501/kodomo/iryo/kenko/6889.html"
+        }
+      ]
+    },
+    {
+      "id": "infant-checkup-9-10m",
+      "title": "9〜10か月児健康診査を受診",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "afterBirth", "days": 300 },
+      "deadline": "soft",
+      "notes": "4か月児健康診査の案内に同封される受診票を使い、東京都内の契約医療機関で受診する。受診期限と予約方法を医療機関へ確認する。",
+      "links": [
+        {
+          "label": "江東区: 6〜7か月児、9〜10か月児健康診査",
+          "url": "https://www.city.koto.lg.jp/260501/kodomo/iryo/kenko/6889.html"
+        }
       ]
     }
   ]

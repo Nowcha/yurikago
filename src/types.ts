@@ -61,9 +61,14 @@ export interface PurchaseItem {
   waitUntilBorn?: boolean; // 産後に様子を見てから買う
 }
 
+export type MotherInsurance = 'employee' | 'national' | 'dependent' | 'other';
+
 export interface HouseholdProfile {
-  bothParentsLeave: boolean;   // 夫婦とも育休取得予定
-  motherIsEmployee: boolean;   // 母親が被雇用者（出産手当金等の対象）
+  motherTakesLeave: boolean;
+  partnerTakesLeave: boolean;
+  motherInsurance: MotherInsurance;
+  bothParentsLeave?: boolean; // 旧データ読み込み用
+  motherIsEmployee?: boolean; // 旧データ読み込み用
 }
 
 export interface Household {
@@ -79,13 +84,14 @@ export interface Household {
 export type CareRecordType =
   | 'breast_l' | 'breast_r' | 'formula' | 'pump'
   | 'pee' | 'poop' | 'sleep' | 'wake'
-  | 'bath' | 'temp' | 'weight' | 'memo';
+  | 'bath' | 'temp' | 'weight' | 'medicine' | 'vaccine' | 'memo';
 
 export interface CareRecord {
   id: string;
   type: CareRecordType;
   at: number;          // epoch ms（記録時刻。あとから編集可能）
   amountMl?: number;   // formula / pump
+  durationMin?: number; // breast_l / breast_r
   temperature?: number; // temp（℃）
   weightG?: number;    // weight
   note?: string;
