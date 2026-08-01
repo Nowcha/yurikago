@@ -6,6 +6,7 @@ import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, query, where, onSnapshot, writeBatch, updateDoc, setDoc,
   arrayUnion, deleteDoc, deleteField, orderBy, limit, getDocs, documentId, startAfter,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import type {
   Household, HouseholdProfile, TaskInstance, TaskTemplate, PurchaseItem, PurchaseCategory,
@@ -453,6 +454,31 @@ export function watchRecords(householdId: string, cb: (records: CareRecord[]) =>
   return onSnapshot(q, (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CareRecord, 'id'>) })));
   });
+}
+/** 選択日の記録を件数制限なしで購読する。長期利用時の履歴表示用 */
+export function watchRecordsForDay(
+  householdId: string,
+  day: string,
+  cb: (records: CareRecord[]) => void,
+  onError: () => void,
+): Unsubscribe {
+  const startDate = new Date(`${day}T00:00:00`);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 1);
+  const dayQuery = query(
+    collection(db, 'households', householdId, 'records'),
+    where('at', '>=', startDate.getTime()),
+    where('at', '<', endDate.getTime()),
+    orderBy('at', 'desc'),
+  );
+  return onSnapshot(
+    dayQuery,
+    (snapshot) => cb(snapshot.docs.map((record) => ({
+      id: record.id,
+      ...(record.data() as Omit<CareRecord, 'id'>),
+    }))),
+    onError,
+  );
 }
 export function addRecord(householdId: string, record: Omit<CareRecord, 'id'>) {
   return setDoc(doc(collection(db, 'households', householdId, 'records')), record);
