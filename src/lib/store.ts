@@ -467,7 +467,7 @@ export function watchRecords(householdId: string, cb: (records: CareRecord[]) =>
     cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CareRecord, 'id'>) })));
   });
 }
-/** 選択日の記録を件数制限なしで購読する。長期利用時の履歴表示用 */
+/** 選択日と前日の記録を件数制限なしで購読する。前日分は日またぎ睡眠の集計に使う。 */
 export function watchRecordsForDay(
   householdId: string,
   day: string,
@@ -475,11 +475,13 @@ export function watchRecordsForDay(
   onError: () => void,
 ): Unsubscribe {
   const startDate = new Date(`${day}T00:00:00`);
+  const contextStartDate = new Date(startDate);
+  contextStartDate.setDate(contextStartDate.getDate() - 1);
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + 1);
   const dayQuery = query(
     collection(db, 'households', householdId, 'records'),
-    where('at', '>=', startDate.getTime()),
+    where('at', '>=', contextStartDate.getTime()),
     where('at', '<', endDate.getTime()),
     orderBy('at', 'desc'),
   );

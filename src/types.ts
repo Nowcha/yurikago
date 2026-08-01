@@ -84,13 +84,14 @@ export interface Household {
 export type CareRecordType =
   | 'breast_l' | 'breast_r' | 'formula' | 'pump'
   | 'pee' | 'poop' | 'sleep' | 'wake'
-  | 'bath' | 'temp' | 'weight' | 'memo';
+  | 'bath' | 'temp' | 'weight' | 'medicine' | 'vaccine' | 'memo';
 
 export interface CareRecord {
   id: string;
   type: CareRecordType;
   at: number;          // epoch ms（記録時刻。あとから編集可能）
   amountMl?: number;   // formula / pump
+  durationMin?: number; // breast_l / breast_r
   temperature?: number; // temp（℃）
   weightG?: number;    // weight
   note?: string;
