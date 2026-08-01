@@ -32,8 +32,13 @@ describe('procedure-master.json: 初期ラインナップ', () => {
       'postpartum-checkup-1m',
       'newborn-hearing-screening',
       'infant-checkup-1m',
+      'infant-checkup-4m',
+      'infant-checkup-6-7m',
+      'infant-checkup-9-10m',
       'vaccination-plan',
       'birth-leave-support-benefit',
+      'national-health-insurance-maternity-exemption',
+      'national-pension-maternity-exemption',
     ]));
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -56,6 +61,25 @@ describe('procedure-master.json: 初期ラインナップ', () => {
     expect(insurance.trigger).toEqual({ type: 'afterBirth', days: 14 });
     expect(insurance.deadline).toBe('soft');
     expect(support.trigger.type).toBe('afterBirth');
+  });
+
+  it('育休と保険区分に応じて対象タスクを出し分ける', () => {
+    const conditionsById = new Map(templates.map((template) => [
+      template.id,
+      (template as { conditions?: { field: string; value: unknown }[] }).conditions,
+    ]));
+    expect(conditionsById.get('postpartum-father-leave-request')).toEqual([
+      { field: 'partnerTakesLeave', value: true },
+    ]);
+    expect(conditionsById.get('childcare-benefit-claim')).toEqual([
+      { field: 'eitherParentTakesLeave', value: true },
+    ]);
+    expect(conditionsById.get('national-health-insurance-maternity-exemption')).toEqual([
+      { field: 'motherInsurance', value: 'national' },
+    ]);
+    expect(conditionsById.get('national-pension-maternity-exemption')).toEqual([
+      { field: 'motherInsurance', value: 'national' },
+    ]);
   });
 });
 

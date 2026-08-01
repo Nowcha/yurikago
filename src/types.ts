@@ -61,9 +61,14 @@ export interface PurchaseItem {
   waitUntilBorn?: boolean; // 産後に様子を見てから買う
 }
 
+export type MotherInsurance = 'employee' | 'national' | 'dependent' | 'other';
+
 export interface HouseholdProfile {
-  bothParentsLeave: boolean;   // 夫婦とも育休取得予定
-  motherIsEmployee: boolean;   // 母親が被雇用者（出産手当金等の対象）
+  motherTakesLeave: boolean;
+  partnerTakesLeave: boolean;
+  motherInsurance: MotherInsurance;
+  bothParentsLeave?: boolean; // 旧データ読み込み用
+  motherIsEmployee?: boolean; // 旧データ読み込み用
 }
 
 export interface Household {

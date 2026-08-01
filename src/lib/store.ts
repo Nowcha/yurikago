@@ -16,6 +16,7 @@ import { resolveDueDate } from './deadline';
 import procedureMaster from '../data/procedure-master.json';
 import purchaseMaster from '../data/purchase-master.json';
 import { collectAllPages } from './pagination';
+import { DEFAULT_HOUSEHOLD_PROFILE, normalizeHouseholdProfile } from './profile';
 
 // ─────────────────────────────────────────────────────────────
 // TODO(セットアップ): Firebaseコンソールの「プロジェクトの設定 > マイアプリ」から
@@ -62,9 +63,20 @@ function matchesProfile(
   conditions: TaskTemplate['conditions'], profile: HouseholdProfile,
 ): boolean {
   if (!conditions) return true;
+  const normalized = normalizeHouseholdProfile(profile);
   return conditions.every((c) => {
-    if (c.field === 'hasChildcareLeave') return profile.bothParentsLeave === c.value;
-    if (c.field === 'role' && c.value === 'mother-employee') return profile.motherIsEmployee;
+    if (c.field === 'hasChildcareLeave' || c.field === 'eitherParentTakesLeave') {
+      return (normalized.motherTakesLeave || normalized.partnerTakesLeave) === c.value;
+    }
+    if (c.field === 'motherTakesLeave') return normalized.motherTakesLeave === c.value;
+    if (c.field === 'partnerTakesLeave') return normalized.partnerTakesLeave === c.value;
+    if (c.field === 'bothParentsLeave') {
+      return (normalized.motherTakesLeave && normalized.partnerTakesLeave) === c.value;
+    }
+    if (c.field === 'motherInsurance') return normalized.motherInsurance === c.value;
+    if (c.field === 'role' && c.value === 'mother-employee') {
+      return normalized.motherInsurance === 'employee';
+    }
     return true;
   });
 }
@@ -278,7 +290,7 @@ export async function syncMasterData(
   const existingItems = new Map(items.map((item) => [item.id, item]));
   const templates = procedureMaster.templates as unknown as TaskTemplate[];
   const masterItems = purchaseMaster.items as unknown as Omit<PurchaseItem, 'id'>[];
-  const profile = household.profile ?? { bothParentsLeave: true, motherIsEmployee: true };
+  const profile = household.profile ?? DEFAULT_HOUSEHOLD_PROFILE;
   const batch = writeBatch(db);
   const result: MasterSyncResult = {
     addedTasks: 0,
