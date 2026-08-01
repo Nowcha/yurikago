@@ -123,7 +123,7 @@ export default function Setup({ user }: { user: User | null }) {
               {busy ? '作成中…' : '世帯をつくってタスクを生成する'}
             </button>
             <p className="mt-2 text-xs text-ink/50">
-              江東区・東京都・国・会社の手続き22件と準備品リストが自動で並びます
+              江東区・東京都・国・会社の手続き35件と準備品リストが自動で並びます
             </p>
           </section>
 

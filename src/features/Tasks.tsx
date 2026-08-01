@@ -1,35 +1,90 @@
 import { useMemo, useState } from 'react';
-import type { Household, TaskInstance, TaskStatus, Assignee } from '../types';
+import type {
+  Household, TaskInstance, TaskStatus, Assignee, TaskCategory,
+} from '../types';
 import { todayYmd, urgency } from '../lib/deadline';
 import { Flag } from 'lucide-react';
-import { updateTask, addTask, removeTask } from '../lib/store';
+import {
+  updateTask, addTask, removeTask, setTaskDueDate, clearTaskAssignee,
+} from '../lib/store';
 import { AssigneeBadge } from './Dashboard';
 import { CATEGORY_LABEL, AUTHORITY_LABEL, assigneeLabel } from '../lib/labels';
 
 export default function Tasks({ household, tasks }: { household: Household; tasks: TaskInstance[] }) {
-  const [showDone, setShowDone] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<TaskCategory | 'all'>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<Assignee | 'none' | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'active' | 'all'>('active');
+  const [deadlineFilter, setDeadlineFilter] = useState<'all' | 'overdue' | 'week' | 'unscheduled'>('all');
   const [selected, setSelected] = useState<TaskInstance | null>(null);
   const today = todayYmd();
 
   const { scheduled, unscheduled } = useMemo(() => {
-    const visible = tasks.filter((t) =>
-      showDone ? true : t.status === 'todo' || t.status === 'doing');
+    const visible = tasks.filter((task) => {
+      if (categoryFilter !== 'all' && task.category !== categoryFilter) return false;
+      if (assigneeFilter === 'none' && task.assignee) return false;
+      if (assigneeFilter !== 'all' && assigneeFilter !== 'none'
+        && task.assignee !== assigneeFilter) return false;
+      if (statusFilter === 'active' && task.status !== 'todo' && task.status !== 'doing') return false;
+      if (statusFilter !== 'active' && statusFilter !== 'all' && task.status !== statusFilter) return false;
+      const taskUrgency = urgency(task.dueDateResolved, today);
+      if (deadlineFilter === 'overdue' && taskUrgency !== 'overdue') return false;
+      if (deadlineFilter === 'week' && taskUrgency !== 'imminent') return false;
+      if (deadlineFilter === 'unscheduled' && taskUrgency !== 'unscheduled') return false;
+      return true;
+    });
     return {
       scheduled: visible
         .filter((t) => t.dueDateResolved)
         .sort((a, b) => (a.dueDateResolved! < b.dueDateResolved! ? -1 : 1)),
       unscheduled: visible.filter((t) => !t.dueDateResolved),
     };
-  }, [tasks, showDone]);
+  }, [assigneeFilter, categoryFilter, deadlineFilter, statusFilter, tasks, today]);
 
   return (
     <div className="px-5 pt-8">
-      <header className="flex items-baseline justify-between">
+      <header>
         <h1 className="font-display text-xl font-bold text-ink">やること</h1>
-        <label className="flex items-center gap-1.5 text-xs text-ink/60">
-          <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />
-          完了も表示
-        </label>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <FilterSelect
+            label="カテゴリ"
+            value={categoryFilter}
+            onChange={(value) => setCategoryFilter(value as TaskCategory | 'all')}
+            options={[
+              ['all', 'すべてのカテゴリ'],
+              ...Object.entries(CATEGORY_LABEL),
+            ]}
+          />
+          <FilterSelect
+            label="担当"
+            value={assigneeFilter}
+            onChange={(value) => setAssigneeFilter(value as Assignee | 'none' | 'all')}
+            options={[
+              ['all', 'すべての担当'],
+              ['partner1', assigneeLabel('partner1', household)],
+              ['partner2', assigneeLabel('partner2', household)],
+              ['both', 'ふたり'],
+              ['none', '担当未定'],
+            ]}
+          />
+          <FilterSelect
+            label="状態"
+            value={statusFilter}
+            onChange={(value) => setStatusFilter(value as TaskStatus | 'active' | 'all')}
+            options={[
+              ['active', '未完了'], ['todo', '未着手'], ['doing', '進行中'],
+              ['done', '完了'], ['na', '対象外'], ['all', 'すべての状態'],
+            ]}
+          />
+          <FilterSelect
+            label="期限"
+            value={deadlineFilter}
+            onChange={(value) => setDeadlineFilter(value as typeof deadlineFilter)}
+            options={[
+              ['all', 'すべての期限'], ['overdue', '期限超過'],
+              ['week', '7日以内'], ['unscheduled', '日付未確定'],
+            ]}
+          />
+        </div>
       </header>
 
       {/* 逆算背骨タイムライン（シグネチャ要素） */}
@@ -54,6 +109,12 @@ export default function Tasks({ household, tasks }: { household: Household; task
           </p>
         </li>
       </ol>
+
+      {scheduled.length === 0 && unscheduled.length === 0 && (
+        <p className="mt-6 rounded-2xl border border-ink/10 bg-white p-5 text-sm text-ink/50">
+          条件に一致するタスクはありません。
+        </p>
+      )}
 
       {unscheduled.length > 0 && (
         <section className="mt-8">
@@ -81,6 +142,28 @@ export default function Tasks({ household, tasks }: { household: Household; task
         />
       )}
     </div>
+  );
+}
+
+function FilterSelect({ label, value, onChange, options }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: [string, string][];
+}) {
+  return (
+    <label className="text-xs font-bold text-ink/50">
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5 text-sm font-normal text-ink"
+      >
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>{optionLabel}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -129,6 +212,11 @@ function TaskSheet({ task, household, onClose }: {
   task: TaskInstance; household: Household; onClose: () => void;
 }) {
   const patch = (p: Partial<TaskInstance>) => updateTask(household.id, task.id, p);
+  const [title, setTitle] = useState(task.title);
+  const [category, setCategory] = useState<TaskCategory>(task.category);
+  const [dueDate, setDueDate] = useState(task.dueDateOverride ?? task.dueDateResolved ?? '');
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
   return (
     <div className="fixed inset-0 z-10 flex items-end bg-ink/40" onClick={onClose}>
       <div
@@ -143,6 +231,79 @@ function TaskSheet({ task, household, onClose }: {
             {task.deadline === 'hard' && <span className="ml-1 text-alert">（法定）</span>}
           </p>
         )}
+
+        <div className="mt-4 space-y-3 rounded-xl bg-base p-4">
+          {!task.templateId && (
+            <>
+              <label className="block text-xs font-bold text-ink/50">
+                タスク名
+                <input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5 text-sm font-normal text-ink"
+                />
+              </label>
+              <label className="block text-xs font-bold text-ink/50">
+                カテゴリ
+                <select
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value as TaskCategory)}
+                  className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5 text-sm font-normal text-ink"
+                >
+                  {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          <label className="block text-xs font-bold text-ink/50">
+            {task.templateId ? '期限の上書き' : '期限'}
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5 text-sm font-normal text-ink"
+            />
+          </label>
+          {task.dueDateOverride && (
+            <button
+              onClick={async () => {
+                setSavingDetails(true);
+                try {
+                  await setTaskDueDate(household, task, null);
+                  setDueDate('');
+                } catch {
+                  setDetailsError('自動計算の期限に戻せませんでした。');
+                } finally {
+                  setSavingDetails(false);
+                }
+              }}
+              className="text-xs font-bold text-accent underline underline-offset-2"
+            >
+              自動計算の期限に戻す
+            </button>
+          )}
+          {detailsError && <p className="text-xs text-alert">{detailsError}</p>}
+          <button
+            disabled={savingDetails || (!task.templateId && !title.trim())}
+            onClick={async () => {
+              setSavingDetails(true);
+              setDetailsError(null);
+              try {
+                if (!task.templateId) await patch({ title: title.trim(), category });
+                await setTaskDueDate(household, task, dueDate || null);
+              } catch {
+                setDetailsError('タスクの変更を保存できませんでした。');
+              } finally {
+                setSavingDetails(false);
+              }
+            }}
+            className="w-full rounded-full border border-ink/15 bg-white py-2.5 text-sm font-bold text-ink disabled:opacity-40"
+          >
+            {savingDetails ? '保存中…' : 'タスク内容を保存'}
+          </button>
+        </div>
 
         <div className="mt-4 flex gap-2">
           {STATUS_OPTIONS.map((s) => (
@@ -171,6 +332,14 @@ function TaskSheet({ task, household, onClose }: {
               {a.label(household)}
             </button>
           ))}
+          {task.assignee && (
+            <button
+              onClick={() => clearTaskAssignee(household.id, task.id)}
+              className="rounded-full bg-base px-3 py-2 text-sm text-ink/60"
+            >
+              解除
+            </button>
+          )}
         </div>
 
         {task.prepTasks && task.prepTasks.length > 0 && (
@@ -231,7 +400,7 @@ function TaskSheet({ task, household, onClose }: {
         )}
 
         <label className="mt-5 block text-xs font-bold text-ink/50">
-          メモ（社内締切の上書き等はここに）
+          メモ
           <textarea
             defaultValue={task.userMemo ?? ''}
             onBlur={(e) => patch({ userMemo: e.target.value })}

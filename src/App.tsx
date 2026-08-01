@@ -25,6 +25,7 @@ const POSTPARTUM_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'records', label: 'きろく', icon: NotebookPen },
   { id: 'home', label: 'ホーム', icon: Home },
   { id: 'tasks', label: 'やること', icon: ListTodo },
+  { id: 'items', label: '準備品', icon: Package },
   { id: 'settings', label: '設定', icon: SettingsIcon },
 ];
 
@@ -76,7 +77,7 @@ export default function App() {
         )}
       </main>
       <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-ink/10 bg-white/95 backdrop-blur">
-        <div className="grid grid-cols-4">
+        <div className={`grid ${tabs.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
           {tabs.map((t) => (
             <button
               key={t.id}

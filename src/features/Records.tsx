@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Heart, Milk, Droplets, Droplet, Baby, Moon, Sun, Bath, Thermometer, Scale,
-  StickyNote, X, type LucideIcon,
+  StickyNote, X, Pencil, ChevronLeft, ChevronRight, type LucideIcon,
 } from 'lucide-react';
 import type { Household, CareRecord, CareRecordType } from '../types';
-import { addRecord, removeRecord } from '../lib/store';
+import { addRecord, removeRecord, replaceRecord } from '../lib/store';
+import { addDays, todayYmd } from '../lib/deadline';
 
 const TYPE_META: Record<CareRecordType, { label: string; needsValue?: 'ml' | 'temp' | 'weight' | 'text' }> = {
   breast_l: { label: '母乳 左' },
@@ -27,6 +28,7 @@ export default function Records({ household, records, uid }: {
   household: Household; records: CareRecord[]; uid: string;
 }) {
   const [pending, setPending] = useState<CareRecordType | null>(null);
+  const [selectedDay, setSelectedDay] = useState(todayYmd());
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick((n) => n + 1), 60_000); // 経過時間表示の更新
@@ -89,8 +91,33 @@ export default function Records({ household, records, uid }: {
         <QuickBtn icon={StickyNote} label="メモ" onTap={() => quickAdd('memo')} />
       </div>
 
-      {/* 当日のタイムライン */}
-      <DayLog household={household} records={records} />
+      <div className="mt-7 flex items-center gap-2">
+        <button
+          onClick={() => setSelectedDay((day) => addDays(day, -1))}
+          className="rounded-full border border-ink/10 bg-white p-2.5 text-ink/60"
+          aria-label="前の日"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <input
+          type="date"
+          value={selectedDay}
+          max={todayYmd()}
+          onChange={(event) => setSelectedDay(event.target.value)}
+          className="min-w-0 flex-1 rounded-full border border-ink/10 bg-white px-4 py-2.5 text-center text-sm text-ink"
+          aria-label="表示する日"
+        />
+        <button
+          disabled={selectedDay >= todayYmd()}
+          onClick={() => setSelectedDay((day) => addDays(day, 1))}
+          className="rounded-full border border-ink/10 bg-white p-2.5 text-ink/60 disabled:opacity-30"
+          aria-label="次の日"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+
+      <DayLog household={household} records={records} selectedDay={selectedDay} />
 
       {pending && (
         <ValueSheet
@@ -122,19 +149,25 @@ function QuickBtn({ icon: Icon, label, onTap, emph }: {
   );
 }
 
-function DayLog({ household, records }: { household: Household; records: CareRecord[] }) {
-  const dayStart = new Date();
-  dayStart.setHours(0, 0, 0, 0);
-  const today = records.filter((r) => r.at >= dayStart.getTime());
+function DayLog({ household, records, selectedDay }: {
+  household: Household;
+  records: CareRecord[];
+  selectedDay: string;
+}) {
+  const [editing, setEditing] = useState<CareRecord | null>(null);
+  const dayStart = new Date(`${selectedDay}T00:00:00`).getTime();
+  const dayEnd = new Date(`${addDays(selectedDay, 1)}T00:00:00`).getTime();
+  const dayRecords = records.filter((record) => record.at >= dayStart && record.at < dayEnd);
+  const heading = selectedDay === todayYmd() ? 'きょうの記録' : `${selectedDay} の記録`;
 
   return (
     <section className="mt-7">
-      <h2 className="text-sm font-bold text-sub">きょうの記録（{today.length}件）</h2>
+      <h2 className="text-sm font-bold text-sub">{heading}（{dayRecords.length}件）</h2>
       <ul className="mt-2 divide-y divide-ink/10 rounded-2xl border border-ink/10 bg-white">
-        {today.length === 0 && (
+        {dayRecords.length === 0 && (
           <li className="p-4 text-sm text-sub">まだ記録がありません</li>
         )}
-        {today.map((r) => (
+        {dayRecords.map((r) => (
           <li key={r.id} className="flex items-center justify-between p-3.5">
             <div className="flex items-baseline gap-3">
               <span className="w-11 font-mono text-xs text-sub">{hhmm(r.at)}</span>
@@ -146,21 +179,129 @@ function DayLog({ household, records }: { household: Household; records: CareRec
                 {r.note}
               </span>
             </div>
-            <button
-              onClick={() => {
-                if (confirm(`${hhmm(r.at)} の「${TYPE_META[r.type].label}」を削除しますか？`)) {
-                  removeRecord(household.id, r.id);
-                }
-              }}
-              className="p-1 text-ink/30"
-              aria-label="削除"
-            >
-              <X size={16} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setEditing(r)}
+                className="p-1.5 text-ink/40"
+                aria-label="編集"
+              >
+                <Pencil size={16} />
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm(`${hhmm(r.at)} の「${TYPE_META[r.type].label}」を削除しますか？`)) {
+                    removeRecord(household.id, r.id);
+                  }
+                }}
+                className="p-1.5 text-ink/30"
+                aria-label="削除"
+              >
+                <X size={16} />
+              </button>
+            </div>
           </li>
         ))}
       </ul>
+      {editing && (
+        <RecordEditSheet
+          record={editing}
+          householdId={household.id}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </section>
+  );
+}
+
+function RecordEditSheet({ record, householdId, onClose }: {
+  record: CareRecord;
+  householdId: string;
+  onClose: () => void;
+}) {
+  const [type, setType] = useState<CareRecordType>(record.type);
+  const [at, setAt] = useState(toDateTimeLocal(record.at));
+  const [value, setValue] = useState(recordValue(record));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const kind = TYPE_META[type].needsValue;
+
+  const save = async (): Promise<void> => {
+    if (!at || (kind && !value.trim())) return;
+    const timestamp = new Date(at).getTime();
+    if (!Number.isFinite(timestamp)) return;
+    const next: CareRecord = { id: record.id, type, at: timestamp };
+    if (record.by) next.by = record.by;
+    if (kind === 'ml') next.amountMl = Number(value);
+    else if (kind === 'temp') next.temperature = Number(value);
+    else if (kind === 'weight') next.weightG = Number(value);
+    else if (kind === 'text') next.note = value.trim();
+
+    setSaving(true);
+    setError(null);
+    try {
+      await replaceRecord(householdId, next);
+      onClose();
+    } catch {
+      setError('記録を保存できませんでした。');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-10 flex items-end bg-ink/40" onClick={onClose}>
+      <div
+        className="w-full rounded-t-2xl bg-white p-6 pb-10"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/15" />
+        <p className="font-display font-bold text-ink">記録を編集</p>
+        <label className="mt-3 block text-xs font-bold text-ink/50">
+          種類
+          <select
+            value={type}
+            onChange={(event) => {
+              setType(event.target.value as CareRecordType);
+              setValue('');
+            }}
+            className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-4 py-3 text-sm font-normal text-ink"
+          >
+            {Object.entries(TYPE_META).map(([valueKey, meta]) => (
+              <option key={valueKey} value={valueKey}>{meta.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="mt-3 block text-xs font-bold text-ink/50">
+          日時
+          <input
+            type="datetime-local"
+            value={at}
+            onChange={(event) => setAt(event.target.value)}
+            className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-4 py-3 text-sm font-normal text-ink"
+          />
+        </label>
+        {kind && (
+          <label className="mt-3 block text-xs font-bold text-ink/50">
+            {kind === 'ml' ? '量（ml）' : kind === 'temp' ? '体温（℃）' : kind === 'weight' ? '体重（g）' : 'メモ'}
+            <input
+              type={kind === 'text' ? 'text' : 'number'}
+              inputMode={kind === 'text' ? 'text' : 'decimal'}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-4 py-3 text-sm font-normal text-ink"
+            />
+          </label>
+        )}
+        {error && <p className="mt-3 text-sm text-alert">{error}</p>}
+        <button
+          disabled={saving || !at || Boolean(kind && !value.trim())}
+          onClick={save}
+          className="mt-4 w-full rounded-full bg-accent py-3.5 font-display font-bold text-white disabled:opacity-40"
+        >
+          {saving ? '保存中…' : '変更を保存'}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -221,6 +362,23 @@ function ValueSheet({ type, onSave, onClose }: {
 function hhmm(ms: number): string {
   const d = new Date(ms);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function toDateTimeLocal(ms: number): string {
+  const date = new Date(ms);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function recordValue(record: CareRecord): string {
+  if (record.amountMl != null) return String(record.amountMl);
+  if (record.temperature != null) return String(record.temperature);
+  if (record.weightG != null) return String(record.weightG);
+  return record.note ?? '';
 }
 
 function elapsed(ms: number): string {

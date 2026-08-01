@@ -1,7 +1,115 @@
 {
-  "version": "0.1-draft",
-  "note": "金額・期限は2026-07時点の公式サイト調査に基づく。実装時にlinksの公式ページで再確認すること。健保組合固有の項目（付加給付・被扶養者追加期限）は要確認。",
+  "version": "0.2",
+  "note": "2026-08-01時点の江東区・東京都・国の公式情報に基づく。会社・健保固有の期限や必要書類は勤務先の一次情報で確認する。",
   "templates": [
+    {
+      "id": "pregnancy-notification",
+      "title": "妊娠届・母子健康手帳・ゆりかご面接",
+      "category": "procedure",
+      "authority": "koto",
+      "trigger": { "type": "beforeDue", "days": 224 },
+      "deadline": "soft",
+      "notes": "出産予定日が判明したら妊娠届を提出し、母子健康手帳と妊婦健診受診券等が入った保健バッグを受け取る。保健相談所では専門職によるゆりかご面接も実施。",
+      "links": [
+        {
+          "label": "江東区: 妊娠届と母子健康手帳",
+          "url": "https://www.city.koto.lg.jp/261201/kodomo/ninshinshussan/ninshin/6875.html"
+        }
+      ]
+    },
+    {
+      "id": "pregnancy-support-first",
+      "title": "妊婦のための支援給付（1回目・5万円）の申請",
+      "category": "procedure",
+      "authority": "koto",
+      "trigger": { "type": "beforeDue", "days": 210 },
+      "deadline": "soft",
+      "notes": "胎児心拍確認後、妊婦給付認定を申請する。江東区ではゆりかご面接時に案内される。申請日時点で江東区に住民登録が必要。",
+      "links": [
+        {
+          "label": "江東区: 妊婦のための支援給付",
+          "url": "https://www.city.koto.lg.jp/260501/kodomo/ninshinshussan/ninshin/97552.html"
+        }
+      ]
+    },
+    {
+      "id": "prenatal-checkups",
+      "title": "妊婦健診の受診券・次回予約を確認",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "beforeDue", "days": 210 },
+      "deadline": "soft",
+      "notes": "受診間隔は妊娠経過や医師の指示を優先する。里帰り等で都外受診する場合は費用助成の対象を確認。",
+      "links": [
+        {
+          "label": "江東区: 妊娠・出産",
+          "url": "https://www.city.koto.lg.jp/shussan.html"
+        }
+      ]
+    },
+    {
+      "id": "prenatal-dental-checkup",
+      "title": "妊婦歯科健康診査を予約",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "week", "week": 20 },
+      "deadline": "soft",
+      "notes": "体調が安定している時期を目安に、母と子の保健バッグの受診票と実施医療機関を確認する。",
+      "links": [
+        {
+          "label": "江東区: 妊娠・出産",
+          "url": "https://www.city.koto.lg.jp/shussan.html"
+        }
+      ]
+    },
+    {
+      "id": "parents-class",
+      "title": "両親学級の参加を検討・予約",
+      "category": "prep",
+      "authority": "koto",
+      "trigger": { "type": "week", "week": 26 },
+      "deadline": "soft",
+      "notes": "初めて赤ちゃんを迎える家庭向け。休日版の対面講座は原則26週から36週未満が対象で、オンライン講座もある。",
+      "links": [
+        {
+          "label": "江東区: 両親学級（休日版）",
+          "url": "https://www.city.koto.lg.jp/261201/kyujituryoshin.html"
+        }
+      ]
+    },
+    {
+      "id": "rs-maternal-vaccine-consult",
+      "title": "RS母子免疫ワクチンを産院で相談",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "week", "week": 28 },
+      "deadline": "soft",
+      "notes": "2026年4月から定期接種。接種の可否・時期は妊婦健診時に産科医へ相談し、本人の意思で判断する。",
+      "links": [
+        {
+          "label": "江東区: RS母子免疫ワクチン定期予防接種",
+          "url": "https://www.city.koto.lg.jp/230900/rsvaccine.html"
+        }
+      ]
+    },
+    {
+      "id": "postpartum-father-leave-request",
+      "title": "産後パパ育休を会社へ申請",
+      "category": "work",
+      "authority": "employer",
+      "trigger": { "type": "beforeDue", "days": 21 },
+      "deadline": "soft",
+      "notes": "出生後8週間以内に取得する出生時育児休業。希望日から開始するには原則2週間前までに申し出る。社内締切は人事に確認して期限を上書きする。",
+      "links": [
+        {
+          "label": "厚生労働省: 育児休業制度特設サイト",
+          "url": "https://www.mhlw.go.jp/seisakunitsuite/bunya/koyou_roudou/koyoukintou/ryouritsu/ikuji/"
+        }
+      ],
+      "conditions": [
+        { "field": "hasChildcareLeave", "value": true }
+      ]
+    },
     {
       "id": "hospital-direct-payment",
       "title": "出産育児一時金の直接支払制度 合意書を産院と締結",
@@ -30,19 +138,31 @@
         "days": 70
       },
       "deadline": "soft",
-      "notes": "産前休業は予定日6週間前から取得可。就業規則の申請期限を確認して期限を上書きする。"
+      "notes": "産前休業は予定日6週間前から取得可。就業規則の申請期限を確認して期限を上書きする。",
+      "links": [
+        {
+          "label": "厚生労働省: 産前・産後休業を取るときは",
+          "url": "https://www.bosei-navi.mhlw.go.jp/ninshin/sanzen_sango.html"
+        }
+      ]
     },
     {
       "id": "childcare-leave-request",
-      "title": "育休の会社申請（夫婦それぞれ）",
+      "title": "通常の育児休業を会社へ申請（夫婦それぞれ）",
       "category": "work",
       "authority": "employer",
       "trigger": {
         "type": "beforeDue",
         "days": 45
       },
-      "deadline": "hard",
-      "notes": "法定では開始予定日の1か月前まで（産後パパ育休は2週間前まで）。出生後休業支援給付金（両親とも一定期間取得で給付率上乗せ）の適用条件を人事に確認。",
+      "deadline": "soft",
+      "notes": "希望日から開始するには原則として開始予定日の1か月前までに申し出る。会社がより短い申出期限を定めている場合もあるため人事に確認。産後パパ育休は別タスク。",
+      "links": [
+        {
+          "label": "厚生労働省: 育児休業",
+          "url": "https://www.mhlw.go.jp/seisakunitsuite/bunya/koyou_roudou/koyoukintou/ryouritsu/ikuji/childcare/"
+        }
+      ],
       "conditions": [
         {
           "field": "hasChildcareLeave",
@@ -56,11 +176,17 @@
       "category": "procedure",
       "authority": "koto",
       "trigger": {
-        "type": "beforeDue",
-        "days": 40
+        "type": "afterBirth",
+        "days": 30
       },
       "deadline": "soft",
-      "notes": "妊娠後期〜出産後に区から案内が届く。区窓口で申請（赤ちゃんファーストとは申請先が別）。"
+      "notes": "江東区では出産後の新生児・産婦訪問等で案内される。申請期限は出産予定日の8週間前の日から2年間。流産・死産等の場合も対象になり得る。",
+      "links": [
+        {
+          "label": "江東区: 妊婦のための支援給付",
+          "url": "https://www.city.koto.lg.jp/260501/kodomo/ninshinshussan/ninshin/97552.html"
+        }
+      ]
     },
     {
       "id": "jintsu-taxi",
@@ -129,25 +255,32 @@
       "links": [
         {
           "label": "江東区: 児童手当",
-          "url": "https://www.city.koto.lg.jp/281011/kodomo/kosodate/teate/jidouteate.html"
+          "url": "https://www.city.koto.lg.jp/281011/2024jidou.html"
         }
       ]
     },
     {
       "id": "health-insurance-dependent",
-      "title": "健康保険の被扶養者追加（会社）",
+      "title": "子どもの健康保険加入（会社健保／国保）",
       "category": "procedure",
-      "authority": "employer",
+      "authority": "national",
       "trigger": {
         "type": "afterBirth",
-        "days": 5
+        "days": 14
       },
-      "deadline": "hard",
+      "deadline": "soft",
       "prepTasks": [
         "どちらの健保に入れるか決める（原則所得が高い方）",
-        "会社の申請様式と必要書類を人事に確認"
+        "会社健保は申請様式と必要書類を人事に確認",
+        "国民健康保険は出生届後に区の加入窓口へ申し出る"
       ],
-      "notes": "期限は健保組合規定（5日以内目安が多い）。医療証（マル乳）の申請に子の保険情報が必要なため最優先。"
+      "notes": "江東区国保の届出は出生日から14日以内。会社健保の扶養追加期限は加入先ごとに異なるため人事・健保へ確認する。子ども医療費助成に関わるため早めに行う。",
+      "links": [
+        {
+          "label": "江東区: 子どもが生まれたとき（国民健康保険）",
+          "url": "https://www.city.koto.lg.jp/250102/fukushi/kokumin/todokede/5147.html"
+        }
+      ]
     },
     {
       "id": "maru-nyu",
@@ -208,8 +341,8 @@
       "notes": "母と子の保健バッグに同封。これを基に新生児訪問（こんにちは赤ちゃん訪問）が行われ、面談完了が赤ちゃんファースト出産時分の申請案内につながる。",
       "links": [
         {
-          "label": "江東区: 赤ちゃんが生まれたら",
-          "url": "https://www.city.koto.lg.jp/kosodate/akachan.html"
+          "label": "江東区: 新生児・産婦訪問指導（出生通知票）",
+          "url": "https://www.city.koto.lg.jp/261301/kodomo/ninshinshussan/shussan/6880.html"
         }
       ]
     },
@@ -223,7 +356,13 @@
         "days": 14
       },
       "deadline": "soft",
-      "notes": "出生届と同時に特急発行申請が可能。018サポート等の電子申請にも使える。"
+      "notes": "任意申請。出生届と同時なら本人・法定代理人の来庁が不要で、原則1週間の特急発行を利用できる。14日以内の義務ではない。",
+      "links": [
+        {
+          "label": "江東区: マイナンバーカード特急発行",
+          "url": "https://www.city.koto.lg.jp/060301/tokkyuu.html"
+        }
+      ]
     },
     {
       "id": "lump-sum-balance",
@@ -235,7 +374,13 @@
         "days": 60
       },
       "deadline": "soft",
-      "notes": "出産費用が50万円未満なら差額を健保に請求。時効は出産翌日から2年。産院の領収書・明細書は必ず保管（区の助成申請にも必要になる場合あり）。"
+      "notes": "出産費用が50万円未満なら差額を健保に請求。時効は出産翌日から2年。産院の領収書・明細書は必ず保管（区の助成申請にも必要になる場合あり）。",
+      "links": [
+        {
+          "label": "江東区: 出産育児一時金",
+          "url": "https://www.city.koto.lg.jp/250104/fukushi/kokumin/kyufu/5170.html"
+        }
+      ]
     },
     {
       "id": "childcare-benefit-claim",
@@ -247,7 +392,13 @@
         "days": 30
       },
       "deadline": "soft",
-      "notes": "通常は会社がハローワークに申請。初回申請時期と必要書類（母子手帳の出生ページ写し等）を人事に確認。出生後休業支援給付金の該当可否もあわせて確認。"
+      "notes": "通常は会社がハローワークに申請。初回申請時期と必要書類（母子手帳の出生ページ写し等）を人事に確認。出生後休業支援給付金の該当可否もあわせて確認。",
+      "links": [
+        {
+          "label": "厚生労働省: 育児休業等給付",
+          "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000135090_00001.html"
+        }
+      ]
     },
     {
       "id": "company-birth-report",
@@ -274,8 +425,8 @@
       "notes": "江東区は宿泊型・日帰り型の産後ケアあり。産前に利用条件と施設を確認しておくと産後すぐ使える。",
       "links": [
         {
-          "label": "江東区: 妊娠・出産",
-          "url": "https://www.city.koto.lg.jp/shussan.html"
+          "label": "江東区: 産後ケア事業",
+          "url": "https://www.city.koto.lg.jp/260501/kodomo/ninshinshussan/kenko/99710.html"
         }
       ]
     },
@@ -340,7 +491,13 @@
         "days": 60
       },
       "deadline": "soft",
-      "notes": "会社独自のベビーシッター利用補助や内閣府ベビーシッター割引券配布の有無・条件を社内ポータルで確認。育児コンシェルジュ等の付帯サービスの登録もあわせて。"
+      "notes": "会社独自のベビーシッター利用補助や内閣府ベビーシッター割引券配布の有無・条件を社内ポータルで確認。育児コンシェルジュ等の付帯サービスの登録もあわせて。",
+      "links": [
+        {
+          "label": "こども家庭庁: 仕事・子育て両立支援事業",
+          "url": "https://www.cfa.go.jp/policies/kokoseido/ryouritsu"
+        }
+      ]
     },
     {
       "id": "cafeteria-plan",
@@ -364,7 +521,115 @@
         "days": 90
       },
       "deadline": "soft",
-      "notes": "江東区は激戦エリアあり。4月入園の申込時期から逆算して見学計画を立てる。"
+      "notes": "年度ごとの入園のしおりと申込締切を確認する。4月一次募集では出生前申込みが可能な場合もあるため、復職予定月から逆算して見学・書類準備を行う。",
+      "links": [
+        {
+          "label": "江東区: 令和8年度保育園等入園の申込み",
+          "url": "https://www.city.koto.lg.jp/280308/hoikuenmoushikomi-r8.html"
+        }
+      ]
+    },
+    {
+      "id": "postpartum-checkup-2w",
+      "title": "産婦健康診査（産後2週間頃）を受診",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "afterBirth", "days": 14 },
+      "deadline": "soft",
+      "notes": "江東区は産後2か月以内の産婦健診を2回まで助成。2026年9月までの受診は一旦自己負担後の償還払い、10月以降は都内共通受診票を利用。",
+      "links": [
+        {
+          "label": "江東区: 産婦健康診査",
+          "url": "https://www.city.koto.lg.jp/260501/kodomo/ninshinshussan/ninshin/97801.html"
+        }
+      ]
+    },
+    {
+      "id": "postpartum-checkup-1m",
+      "title": "産婦健康診査（産後1か月頃）を受診",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "afterBirth", "days": 30 },
+      "deadline": "soft",
+      "notes": "体調・血圧・尿検査等に加え、産後の心身の状態を確認する。受診時期は出産施設の案内を優先。",
+      "links": [
+        {
+          "label": "江東区: 産婦健康診査",
+          "url": "https://www.city.koto.lg.jp/260501/kodomo/ninshinshussan/ninshin/97801.html"
+        }
+      ]
+    },
+    {
+      "id": "newborn-hearing-screening",
+      "title": "新生児聴覚検査を受ける",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "afterBirth", "days": 3 },
+      "deadline": "soft",
+      "prepTasks": [
+        "母と子の保健バッグにある新生児聴覚検査受診票を確認",
+        "里帰り出産の場合は助成金申請に必要な領収書・明細書を保管"
+      ],
+      "notes": "原則として出生後おおむね3日以内に実施。江東区の助成対象は生後50日まで。出産施設での実施有無を確認する。",
+      "links": [
+        {
+          "label": "江東区: 新生児聴覚検査",
+          "url": "https://www.city.koto.lg.jp/260501/kodomo/ninshinshussan/ninshin/6890.html"
+        }
+      ]
+    },
+    {
+      "id": "infant-checkup-1m",
+      "title": "1か月児健康診査を受診",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "afterBirth", "days": 35 },
+      "deadline": "soft",
+      "notes": "2026年10月以降の共通受診票は生後28日から41日まで使用可能。2026年4月から9月は償還払い助成。出産施設の予約案内を確認する。",
+      "links": [
+        {
+          "label": "江東区: 1か月児健康診査",
+          "url": "https://www.city.koto.lg.jp/260501/kodomo/iryo/kenko/6894.html"
+        }
+      ]
+    },
+    {
+      "id": "vaccination-plan",
+      "title": "生後2か月からの予防接種を予約",
+      "category": "health",
+      "authority": "koto",
+      "trigger": { "type": "afterBirth", "days": 45 },
+      "deadline": "soft",
+      "prepTasks": [
+        "江東区の予診票が届いているか確認",
+        "指定医療機関を選び、同時接種を含む初回日程を相談",
+        "母子健康手帳をすぐ持ち出せる場所に保管"
+      ],
+      "notes": "ロタ、B型肝炎、小児用肺炎球菌、五種混合などは生後2か月から開始できる。接種可否と日程は小児科へ確認。",
+      "links": [
+        {
+          "label": "江東区: こどもの予防接種",
+          "url": "https://www.city.koto.lg.jp/260501/kodomo/iryo/yobo/6874.html"
+        }
+      ]
+    },
+    {
+      "id": "birth-leave-support-benefit",
+      "title": "出生後休業支援給付金の申請確認",
+      "category": "work",
+      "authority": "employer",
+      "trigger": { "type": "afterBirth", "days": 28 },
+      "deadline": "soft",
+      "notes": "原則として両親が対象期間内に14日以上の育児休業を取得した場合、育児休業給付に13％が上乗せされる。申請は通常、育児休業給付と合わせて会社経由で行う。",
+      "links": [
+        {
+          "label": "厚生労働省: 出生後休業支援給付",
+          "url": "https://www.mhlw.go.jp/stf/newpage_51380.html"
+        }
+      ],
+      "conditions": [
+        { "field": "hasChildcareLeave", "value": true }
+      ]
     }
   ]
 }

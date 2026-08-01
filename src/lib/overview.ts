@@ -70,12 +70,12 @@ export function purchaseAlerts(
 }
 
 /**
- * 産後2週間スプリント: afterBirthタスクを期限昇順、同日はhard（法定）優先で返す。
+ * 産後2週間スプリント: 出生後14日以内のタスクを期限昇順、同日はhard（法定）優先で返す。
  * 完了済みも含める（スプリントの消し込み状況を可視化するため）
  */
 export function sprintTasks(tasks: TaskInstance[]): TaskInstance[] {
   return tasks
-    .filter((t) => t.trigger.type === 'afterBirth')
+    .filter((t) => t.trigger.type === 'afterBirth' && t.trigger.days <= 14)
     .slice()
     .sort((a, b) => {
       const dueA = a.dueDateResolved ?? '9999-12-31';

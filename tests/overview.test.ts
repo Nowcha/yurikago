@@ -108,13 +108,13 @@ describe('purchaseAlerts', () => {
 });
 
 describe('sprintTasks', () => {
-  it('afterBirthタスクのみを期限昇順・同日ならhard優先で返す', () => {
+  it('出生後14日以内のタスクのみを期限昇順・同日ならhard優先で返す', () => {
     const tasks = [
       task({ id: 'prep', trigger: { type: 'beforeDue', days: 30 }, dueDateResolved: '2026-09-01' }),
       task({
-        id: 'soft15',
-        trigger: { type: 'afterBirth', days: 15 },
-        dueDateResolved: '2026-10-16',
+        id: 'later',
+        trigger: { type: 'afterBirth', days: 30 },
+        dueDateResolved: '2026-10-31',
       }),
       task({
         id: 'hard14',
@@ -124,12 +124,12 @@ describe('sprintTasks', () => {
       }),
       task({
         id: 'hard-same-day',
-        trigger: { type: 'afterBirth', days: 15 },
+        trigger: { type: 'afterBirth', days: 14 },
         deadline: 'hard',
-        dueDateResolved: '2026-10-16',
+        dueDateResolved: '2026-10-14',
       }),
     ];
-    expect(sprintTasks(tasks).map((t) => t.id)).toEqual(['hard14', 'hard-same-day', 'soft15']);
+    expect(sprintTasks(tasks).map((t) => t.id)).toEqual(['hard14', 'hard-same-day']);
   });
 
   it('完了・対象外タスクも表示対象に含む（スプリントの消し込みを可視化するため）', () => {

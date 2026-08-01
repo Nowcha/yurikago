@@ -36,6 +36,7 @@ export interface TaskInstance {
   status: TaskStatus;
   assignee?: Assignee;
   dueDateResolved: string | null; // YYYY-MM-DD, afterBirthで出生日未確定ならnull
+  dueDateOverride?: string;       // 利用者が自動計算より優先して設定した期限
   userMemo?: string;
   createdAt: number;
 }
