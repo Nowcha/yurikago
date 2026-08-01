@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import type { Household, PurchaseItem, PurchaseCategory, Assignee } from '../types';
-import { updateItem, addItem, clearItemAssignee } from '../lib/store';
-import { purchaseAlerts } from '../lib/overview';
+import type {
+  Household, PurchaseItem, PurchaseCategory, PurchaseMethod, Assignee,
+} from '../types';
+import {
+  updateItem, addItem, clearItemAssignee, updateItemDetails, removeItem,
+} from '../lib/store';
+import { purchaseAlerts, purchaseDueDate } from '../lib/overview';
 import { assigneeLabel } from '../lib/labels';
 import { todayYmd } from '../lib/deadline';
+import { Pencil } from 'lucide-react';
 
 const CATEGORIES: { id: PurchaseCategory; label: string }[] = [
   { id: 'sleep', label: 'ねんね' },
@@ -14,14 +19,16 @@ const CATEGORIES: { id: PurchaseCategory; label: string }[] = [
   { id: 'mom', label: 'ママ用品' },
   { id: 'other', label: 'その他' },
 ];
-const METHOD_LABEL: Record<string, string> = {
+const METHOD_LABEL: Record<PurchaseMethod, string> = {
   buy: '購入', rental: 'レンタル', handmedown: 'お下がり', gift: 'もらう', undecided: '未定',
 };
+const METHODS = Object.entries(METHOD_LABEL) as [PurchaseMethod, string][];
 
 export default function Purchases({ household, items }: {
   household: Household; items: PurchaseItem[];
 }) {
   const [newName, setNewName] = useState('');
+  const [selected, setSelected] = useState<PurchaseItem | null>(null);
   const today = todayYmd();
   const active = items.filter((i) => i.status !== 'skipped');
   const budget = active.reduce((s, i) => s + (i.budget ?? 0), 0);
@@ -61,7 +68,12 @@ export default function Purchases({ household, items }: {
             <h2 className="text-sm font-bold text-ink/60">{c.label}</h2>
             <ul className="mt-2 space-y-2">
               {list.map((i) => (
-                <ItemRow key={i.id} item={i} household={household} />
+                <ItemRow
+                  key={i.id}
+                  item={i}
+                  household={household}
+                  onOpen={() => setSelected(i)}
+                />
               ))}
             </ul>
           </section>
@@ -89,6 +101,15 @@ export default function Purchases({ household, items }: {
         />
         <button className="rounded-full bg-accent px-5 font-bold text-white">追加</button>
       </form>
+
+      {selected && (
+        <PurchaseSheet
+          key={selected.id}
+          item={items.find((item) => item.id === selected.id) ?? selected}
+          household={household}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
@@ -103,10 +124,15 @@ function nextAssignee(current?: Assignee): Assignee | undefined {
   }
 }
 
-function ItemRow({ item, household }: { item: PurchaseItem; household: Household }) {
+function ItemRow({ item, household, onOpen }: {
+  item: PurchaseItem;
+  household: Household;
+  onOpen: () => void;
+}) {
   const householdId = household.id;
   const done = item.status === 'done';
   const skipped = item.status === 'skipped';
+  const due = purchaseDueDate(item, household.dueDate, household.birthDate);
   const cycleAssignee = () => {
     const next = nextAssignee(item.assignee);
     return next
@@ -148,20 +174,44 @@ function ItemRow({ item, household }: { item: PurchaseItem; household: Household
             )}
           </p>
           {item.memo && <p className="mt-1 text-xs text-ink/50">{item.memo}</p>}
+          {item.userMemo && (
+            <p className="mt-1 rounded-lg bg-base px-2 py-1.5 text-xs text-ink/70">
+              {item.userMemo}
+            </p>
+          )}
         </div>
-        {!skipped && (
+        <div className="flex shrink-0 items-center gap-1">
+          {!skipped && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await updateItem(householdId, item.id, { status: 'skipped' });
+                } catch {
+                  alert('状態を変更できませんでした');
+                }
+              }}
+              className="px-1 py-2 text-xs text-ink/40"
+            >
+              不要
+            </button>
+          )}
           <button
-            onClick={() => updateItem(householdId, item.id, { status: 'skipped' })}
-            className="text-xs text-ink/40"
+            type="button"
+            onClick={onOpen}
+            aria-label={`${item.name}を編集`}
+            className="rounded-full border border-ink/10 p-2 text-ink/50"
           >
-            不要
+            <Pencil size={15} strokeWidth={1.6} aria-hidden />
           </button>
-        )}
+        </div>
       </div>
+      {due && <p className="mt-2 pl-8 text-xs text-ink/40">必要日 {due}</p>}
       {done && (
         <label className="mt-2 block pl-8 text-xs text-ink/50">
           実費 ¥
           <input
+            key={item.actualCost ?? 'empty'}
             type="number"
             defaultValue={item.actualCost ?? ''}
             onBlur={(e) => {
@@ -173,5 +223,222 @@ function ItemRow({ item, household }: { item: PurchaseItem; household: Household
         </label>
       )}
     </li>
+  );
+}
+
+function PurchaseSheet({ item, household, onClose }: {
+  item: PurchaseItem;
+  household: Household;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(item.name);
+  const [category, setCategory] = useState<PurchaseCategory>(item.category);
+  const [method, setMethod] = useState<PurchaseMethod>(item.method);
+  const [budget, setBudget] = useState(item.budget?.toString() ?? '');
+  const [actualCost, setActualCost] = useState(item.actualCost?.toString() ?? '');
+  const [neededDate, setNeededDate] = useState(
+    item.neededByDateOverride
+      ?? purchaseDueDate(item, household.dueDate, household.birthDate)
+      ?? '',
+  );
+  const [userMemo, setUserMemo] = useState(item.userMemo ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (): Promise<void> => {
+    if (!name.trim()) return;
+    const parsedBudget = budget === '' ? null : Number(budget);
+    const parsedActualCost = actualCost === '' ? null : Number(actualCost);
+    if ((parsedBudget != null && (!Number.isFinite(parsedBudget) || parsedBudget < 0))
+      || (parsedActualCost != null && (!Number.isFinite(parsedActualCost) || parsedActualCost < 0))) {
+      setError('予算と実費は0以上の数値で入力してください。');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const calculatedDate = purchaseDueDate(
+        { ...item, neededByDateOverride: undefined },
+        household.dueDate,
+        household.birthDate,
+      );
+      const overrideDate = neededDate === ''
+        || (!item.neededByDateOverride && neededDate === calculatedDate)
+        ? null
+        : neededDate;
+      await updateItemDetails(household.id, item.id, {
+        name: name.trim(),
+        category,
+        method,
+        budget: parsedBudget,
+        actualCost: parsedActualCost,
+        neededByDateOverride: overrideDate,
+        userMemo,
+      });
+      onClose();
+    } catch {
+      setError('準備品の変更を保存できませんでした。');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setStatus = async (status: PurchaseItem['status']): Promise<void> => {
+    setError(null);
+    try {
+      await updateItem(household.id, item.id, { status });
+    } catch {
+      setError('状態を変更できませんでした。');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-10 flex items-end bg-ink/40" onClick={onClose}>
+      <div
+        className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 pb-10"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/15" />
+        <h2 className="font-display text-lg font-bold text-ink">準備品を編集</h2>
+
+        <div className="mt-4 space-y-3">
+          <label className="block text-xs font-bold text-ink/50">
+            品名
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-3 py-2.5 text-sm font-normal text-ink"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-xs font-bold text-ink/50">
+              カテゴリ
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value as PurchaseCategory)}
+                className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-3 py-2.5 text-sm font-normal text-ink"
+              >
+                {CATEGORIES.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs font-bold text-ink/50">
+              入手方法
+              <select
+                value={method}
+                onChange={(event) => setMethod(event.target.value as PurchaseMethod)}
+                className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-3 py-2.5 text-sm font-normal text-ink"
+              >
+                {METHODS.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberField label="予算" value={budget} onChange={setBudget} />
+            <NumberField label="実費" value={actualCost} onChange={setActualCost} />
+          </div>
+          <label className="block text-xs font-bold text-ink/50">
+            必要日
+            <input
+              type="date"
+              value={neededDate}
+              onChange={(event) => setNeededDate(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-3 py-2.5 text-sm font-normal text-ink"
+            />
+          </label>
+          {item.neededByDateOverride && (
+            <button
+              type="button"
+              onClick={() => setNeededDate('')}
+              className="text-xs font-bold text-accent underline underline-offset-2"
+            >
+              マスターの必要日に戻す
+            </button>
+          )}
+          {item.memo && (
+            <p className="rounded-xl bg-base p-3 text-xs leading-relaxed text-ink/60">
+              {item.memo}
+            </p>
+          )}
+          <label className="block text-xs font-bold text-ink/50">
+            家庭メモ
+            <textarea
+              value={userMemo}
+              onChange={(event) => setUserMemo(event.target.value)}
+              rows={3}
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-3 py-2.5 text-sm font-normal text-ink"
+            />
+          </label>
+        </div>
+
+        <p className="mt-5 text-xs font-bold text-ink/50">状態</p>
+        <div className="mt-1.5 grid grid-cols-3 gap-2">
+          {([
+            ['todo', '未準備'], ['done', '準備済み'], ['skipped', '不要'],
+          ] as const).map(([status, label]) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => void setStatus(status)}
+              className={`rounded-full py-2 text-sm font-medium ${
+                item.status === status ? 'bg-accent text-white' : 'bg-base text-ink/60'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {error && <p className="mt-3 text-xs text-alert">{error}</p>}
+        <button
+          type="button"
+          disabled={saving || !name.trim()}
+          onClick={save}
+          className="mt-5 w-full rounded-full bg-accent py-3 font-bold text-white disabled:opacity-40"
+        >
+          {saving ? '保存中…' : '変更を保存'}
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            if (!confirm('この準備品を削除しますか？')) return;
+            setSaving(true);
+            try {
+              await removeItem(household.id, item.id);
+              onClose();
+            } catch {
+              setError('準備品を削除できませんでした。');
+              setSaving(false);
+            }
+          }}
+          className="mt-3 w-full rounded-full bg-alert/10 py-2.5 text-sm font-bold text-alert"
+        >
+          準備品を削除
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NumberField({ label, value, onChange }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block text-xs font-bold text-ink/50">
+      {label}（円）
+      <input
+        type="number"
+        min="0"
+        inputMode="numeric"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-3 py-2.5 text-sm font-normal text-ink"
+      />
+    </label>
   );
 }

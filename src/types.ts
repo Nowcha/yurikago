@@ -56,6 +56,8 @@ export interface PurchaseItem {
   status: 'todo' | 'done' | 'skipped';
   assignee?: Assignee;
   memo?: string;
+  userMemo?: string;
+  neededByDateOverride?: string; // 家庭の予定に合わせた必要日の上書き（YYYY-MM-DD）
   waitUntilBorn?: boolean; // 産後に様子を見てから買う
 }
 

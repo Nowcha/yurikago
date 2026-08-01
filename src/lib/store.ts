@@ -7,7 +7,10 @@ import {
   collection, doc, query, where, onSnapshot, writeBatch, updateDoc, setDoc,
   arrayUnion, deleteDoc, deleteField, orderBy, limit, getDocs, documentId, startAfter,
 } from 'firebase/firestore';
-import type { Household, HouseholdProfile, TaskInstance, TaskTemplate, PurchaseItem, CareRecord } from '../types';
+import type {
+  Household, HouseholdProfile, TaskInstance, TaskTemplate, PurchaseItem, PurchaseCategory,
+  PurchaseMethod, CareRecord,
+} from '../types';
 import { resolveDueDate } from './deadline';
 import procedureMaster from '../data/procedure-master.json';
 import purchaseMaster from '../data/purchase-master.json';
@@ -223,11 +226,38 @@ export function updateItem(householdId: string, itemId: string, patch: Partial<P
 export function addItem(householdId: string, item: Omit<PurchaseItem, 'id'>) {
   return setDoc(doc(collection(db, 'households', householdId, 'items')), item);
 }
+export interface PurchaseItemDetailsInput {
+  name: string;
+  category: PurchaseCategory;
+  method: PurchaseMethod;
+  budget: number | null;
+  actualCost: number | null;
+  neededByDateOverride: string | null;
+  userMemo: string;
+}
+export function updateItemDetails(
+  householdId: string,
+  itemId: string,
+  input: PurchaseItemDetailsInput,
+): Promise<void> {
+  return updateDoc(doc(db, 'households', householdId, 'items', itemId), {
+    name: input.name,
+    category: input.category,
+    method: input.method,
+    budget: input.budget ?? deleteField(),
+    actualCost: input.actualCost ?? deleteField(),
+    neededByDateOverride: input.neededByDateOverride ?? deleteField(),
+    userMemo: input.userMemo.trim() || deleteField(),
+  });
+}
 /** 担当の解除。Firestoreはundefinedを拒否するためdeleteField()でフィールドごと消す */
 export function clearItemAssignee(householdId: string, itemId: string) {
   return updateDoc(doc(db, 'households', householdId, 'items', itemId), {
     assignee: deleteField(),
   });
+}
+export function removeItem(householdId: string, itemId: string): Promise<void> {
+  return deleteDoc(doc(db, 'households', householdId, 'items', itemId));
 }
 
 export interface MasterSyncResult {
