@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import type { Household, CareRecord, CareRecordType } from '../types';
 import { addRecord, removeRecord, replaceRecord, watchRecordsForDay } from '../lib/store';
-import { summarizeCareDay } from '../lib/records';
+import { parsePositiveMeasurement, summarizeCareDay } from '../lib/records';
 import { addDays, todayYmd } from '../lib/deadline';
 
 const TYPE_META: Record<CareRecordType, { label: string; needsValue?: 'ml' | 'temp' | 'weight' | 'text' }> = {
@@ -68,17 +68,27 @@ export default function Records({ household, records, uid }: {
   );
   const sleeping = lastSleepState?.type === 'sleep';
 
-  const quickAdd = async (type: CareRecordType): Promise<void> => {
+  const enqueueRecord = (record: Omit<CareRecord, 'id'>): boolean => {
+    setRecordError(null);
+    try {
+      // FirestoreのPromiseはサーバー反映まで完了しないため、オフライン操作では待たない。
+      const pendingWrite = addRecord(household.id, record);
+      void pendingWrite.catch(() => {
+        setRecordError('記録を同期できませんでした。通信状態を確認してください。');
+      });
+      return true;
+    } catch {
+      setRecordError('記録を保存できませんでした。もう一度お試しください。');
+      return false;
+    }
+  };
+
+  const quickAdd = (type: CareRecordType): void => {
     if (TYPE_META[type].needsValue) {
       setPending(type);
       return;
     }
-    setRecordError(null);
-    try {
-      await addRecord(household.id, { type, at: Date.now(), by: uid });
-    } catch {
-      setRecordError('記録を保存できませんでした。もう一度お試しください。');
-    }
+    enqueueRecord({ type, at: Date.now(), by: uid });
   };
 
   return (
@@ -102,21 +112,21 @@ export default function Records({ household, records, uid }: {
 
       {/* ワンタップ記録グリッド */}
       <div className="mt-5 grid grid-cols-3 gap-2.5">
-        <QuickBtn icon={Heart} label="母乳 左" onTap={() => void quickAdd('breast_l')} />
-        <QuickBtn icon={Heart} label="母乳 右" onTap={() => void quickAdd('breast_r')} />
-        <QuickBtn icon={Milk} label="ミルク" onTap={() => void quickAdd('formula')} />
-        <QuickBtn icon={Droplet} label="おしっこ" onTap={() => void quickAdd('pee')} />
-        <QuickBtn icon={Baby} label="うんち" onTap={() => void quickAdd('poop')} />
-        <QuickBtn icon={Droplets} label="搾乳" onTap={() => void quickAdd('pump')} />
+        <QuickBtn icon={Heart} label="母乳 左" onTap={() => quickAdd('breast_l')} />
+        <QuickBtn icon={Heart} label="母乳 右" onTap={() => quickAdd('breast_r')} />
+        <QuickBtn icon={Milk} label="ミルク" onTap={() => quickAdd('formula')} />
+        <QuickBtn icon={Droplet} label="おしっこ" onTap={() => quickAdd('pee')} />
+        <QuickBtn icon={Baby} label="うんち" onTap={() => quickAdd('poop')} />
+        <QuickBtn icon={Droplets} label="搾乳" onTap={() => quickAdd('pump')} />
         {sleeping ? (
-          <QuickBtn icon={Sun} label="おきた" onTap={() => void quickAdd('wake')} emph />
+          <QuickBtn icon={Sun} label="おきた" onTap={() => quickAdd('wake')} emph />
         ) : (
-          <QuickBtn icon={Moon} label="ねた" onTap={() => void quickAdd('sleep')} emph />
+          <QuickBtn icon={Moon} label="ねた" onTap={() => quickAdd('sleep')} emph />
         )}
-        <QuickBtn icon={Bath} label="沐浴" onTap={() => void quickAdd('bath')} />
-        <QuickBtn icon={Thermometer} label="体温" onTap={() => void quickAdd('temp')} />
-        <QuickBtn icon={Scale} label="体重" onTap={() => void quickAdd('weight')} />
-        <QuickBtn icon={StickyNote} label="メモ" onTap={() => void quickAdd('memo')} />
+        <QuickBtn icon={Bath} label="沐浴" onTap={() => quickAdd('bath')} />
+        <QuickBtn icon={Thermometer} label="体温" onTap={() => quickAdd('temp')} />
+        <QuickBtn icon={Scale} label="体重" onTap={() => quickAdd('weight')} />
+        <QuickBtn icon={StickyNote} label="メモ" onTap={() => quickAdd('memo')} />
       </div>
       {recordError && <p className="mt-3 text-sm text-alert">{recordError}</p>}
 
@@ -160,10 +170,12 @@ export default function Records({ household, records, uid }: {
         <ValueSheet
           type={pending}
           onClose={() => setPending(null)}
-          onSave={(payload) => addRecord(
-            household.id,
-            { type: pending, at: Date.now(), by: uid, ...payload },
-          )}
+          onSave={(payload) => enqueueRecord({
+            type: pending,
+            at: Date.now(),
+            by: uid,
+            ...payload,
+          })}
         />
       )}
     </div>
@@ -290,25 +302,30 @@ function RecordEditSheet({ record, householdId, onClose }: {
   const [error, setError] = useState<string | null>(null);
   const kind = TYPE_META[type].needsValue;
 
-  const save = async (): Promise<void> => {
+  const save = (): void => {
     if (!at || (kind && !value.trim())) return;
     const timestamp = new Date(at).getTime();
     if (!Number.isFinite(timestamp)) return;
+    const measurement = kind && kind !== 'text' ? parsePositiveMeasurement(value) : null;
+    if (kind && kind !== 'text' && measurement == null) {
+      setError('0より大きい数値を入力してください。');
+      return;
+    }
     const next: CareRecord = { id: record.id, type, at: timestamp };
     if (record.by) next.by = record.by;
-    if (kind === 'ml') next.amountMl = Number(value);
-    else if (kind === 'temp') next.temperature = Number(value);
-    else if (kind === 'weight') next.weightG = Number(value);
+    if (kind === 'ml' && measurement != null) next.amountMl = measurement;
+    else if (kind === 'temp' && measurement != null) next.temperature = measurement;
+    else if (kind === 'weight' && measurement != null) next.weightG = measurement;
     else if (kind === 'text') next.note = value.trim();
 
     setSaving(true);
     setError(null);
     try {
-      await replaceRecord(householdId, next);
+      const pendingWrite = replaceRecord(householdId, next);
       onClose();
+      void pendingWrite.catch(() => alert('記録を同期できませんでした'));
     } catch {
       setError('記録を保存できませんでした。');
-    } finally {
       setSaving(false);
     }
   };
@@ -351,6 +368,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
             <input
               type={kind === 'text' ? 'text' : 'number'}
               inputMode={kind === 'text' ? 'text' : 'decimal'}
+              min={kind === 'text' ? undefined : '0.1'}
               value={value}
               onChange={(event) => setValue(event.target.value)}
               className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-4 py-3 text-sm font-normal text-ink"
@@ -372,11 +390,10 @@ function RecordEditSheet({ record, householdId, onClose }: {
 
 function ValueSheet({ type, onSave, onClose }: {
   type: CareRecordType;
-  onSave: (p: Partial<CareRecord>) => Promise<void>;
+  onSave: (p: Partial<CareRecord>) => boolean;
   onClose: () => void;
 }) {
   const [value, setValue] = useState('');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const kind = TYPE_META[type].needsValue!;
   const config = {
@@ -386,22 +403,26 @@ function ValueSheet({ type, onSave, onClose }: {
     text: { label: 'メモ', input: 'text', placeholder: '' },
   }[kind];
 
-  const save = async (): Promise<void> => {
+  const save = (): void => {
     if (!value.trim()) return;
     const payload: Partial<CareRecord> = {};
-    if (kind === 'ml') payload.amountMl = Number(value);
-    else if (kind === 'temp') payload.temperature = Number(value);
-    else if (kind === 'weight') payload.weightG = Number(value);
-    else payload.note = value.trim();
-    setSaving(true);
+    if (kind === 'text') {
+      payload.note = value.trim();
+    } else {
+      const measurement = parsePositiveMeasurement(value);
+      if (measurement == null) {
+        setError('0より大きい数値を入力してください。');
+        return;
+      }
+      if (kind === 'ml') payload.amountMl = measurement;
+      else if (kind === 'temp') payload.temperature = measurement;
+      else payload.weightG = measurement;
+    }
     setError(null);
-    try {
-      await onSave(payload);
+    if (onSave(payload)) {
       onClose();
-    } catch {
+    } else {
       setError('記録を保存できませんでした。');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -419,21 +440,22 @@ function ValueSheet({ type, onSave, onClose }: {
           autoFocus
           type={config.input}
           inputMode={kind === 'text' ? 'text' : 'decimal'}
+          min={kind === 'text' ? undefined : '0.1'}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') void save();
+            if (e.key === 'Enter') save();
           }}
           placeholder={config.placeholder}
           className="mt-3 w-full rounded-xl border border-ink/15 bg-base px-4 py-3.5 text-lg"
         />
         {error && <p className="mt-3 text-sm text-alert">{error}</p>}
         <button
-          onClick={() => void save()}
-          disabled={saving || !value.trim()}
+          onClick={save}
+          disabled={!value.trim()}
           className="mt-4 w-full rounded-full bg-accent py-3.5 font-display font-bold text-white disabled:opacity-40"
         >
-          {saving ? '保存中…' : '記録する'}
+          記録する
         </button>
       </div>
     </div>

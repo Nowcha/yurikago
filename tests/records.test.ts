@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeCareDay } from '../src/lib/records';
+import { parsePositiveMeasurement, summarizeCareDay } from '../src/lib/records';
 import type { CareRecord } from '../src/types';
 
 function record(id: string, type: CareRecord['type'], amountMl?: number): CareRecord {
@@ -35,5 +35,25 @@ describe('summarizeCareDay', () => {
       peeCount: 0,
       poopCount: 0,
     });
+  });
+
+  it('不正なミルク量は合計に含めない', () => {
+    const records = [
+      record('1', 'formula', -20),
+      record('2', 'formula', Number.NaN),
+      record('3', 'formula', 50),
+    ];
+    expect(summarizeCareDay(records).formulaMl).toBe(50);
+  });
+});
+
+describe('parsePositiveMeasurement', () => {
+  it('正の有限値を数値へ変換する', () => {
+    expect(parsePositiveMeasurement('80')).toBe(80);
+    expect(parsePositiveMeasurement('36.8')).toBe(36.8);
+  });
+
+  it.each(['', '0', '-1', 'NaN', 'Infinity'])('%sは無効値として扱う', (value) => {
+    expect(parsePositiveMeasurement(value)).toBeNull();
   });
 });

@@ -245,7 +245,7 @@ function PurchaseSheet({ item, household, onClose }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const save = async (): Promise<void> => {
+  const save = (): void => {
     if (!name.trim()) return;
     const parsedBudget = budget === '' ? null : Number(budget);
     const parsedActualCost = actualCost === '' ? null : Number(actualCost);
@@ -266,7 +266,8 @@ function PurchaseSheet({ item, household, onClose }: {
         || (!item.neededByDateOverride && neededDate === calculatedDate)
         ? null
         : neededDate;
-      await updateItemDetails(household.id, item.id, {
+      // ローカルキャッシュへの反映後は閉じ、サーバー応答待ちでオフラインUIを止めない。
+      const pendingWrite = updateItemDetails(household.id, item.id, {
         name: name.trim(),
         category,
         method,
@@ -276,17 +277,18 @@ function PurchaseSheet({ item, household, onClose }: {
         userMemo,
       });
       onClose();
+      void pendingWrite.catch(() => alert('準備品の変更を同期できませんでした'));
     } catch {
       setError('準備品の変更を保存できませんでした。');
-    } finally {
       setSaving(false);
     }
   };
 
-  const setStatus = async (status: PurchaseItem['status']): Promise<void> => {
+  const setStatus = (status: PurchaseItem['status']): void => {
     setError(null);
     try {
-      await updateItem(household.id, item.id, { status });
+      const pendingWrite = updateItem(household.id, item.id, { status });
+      void pendingWrite.catch(() => setError('状態を同期できませんでした。'));
     } catch {
       setError('状態を変更できませんでした。');
     }
@@ -382,7 +384,7 @@ function PurchaseSheet({ item, household, onClose }: {
             <button
               key={status}
               type="button"
-              onClick={() => void setStatus(status)}
+              onClick={() => setStatus(status)}
               className={`rounded-full py-2 text-sm font-medium ${
                 item.status === status ? 'bg-accent text-white' : 'bg-base text-ink/60'
               }`}
@@ -403,12 +405,13 @@ function PurchaseSheet({ item, household, onClose }: {
         </button>
         <button
           type="button"
-          onClick={async () => {
+          onClick={() => {
             if (!confirm('この準備品を削除しますか？')) return;
             setSaving(true);
             try {
-              await removeItem(household.id, item.id);
+              const pendingWrite = removeItem(household.id, item.id);
               onClose();
+              void pendingWrite.catch(() => alert('準備品を削除できませんでした'));
             } catch {
               setError('準備品を削除できませんでした。');
               setSaving(false);
