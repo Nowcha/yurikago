@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import type { Household, TaskInstance, PurchaseItem, CareRecord } from './types';
-import { Home, ClipboardList, ShoppingBag, Baby, Settings as SettingsIcon, type LucideIcon } from 'lucide-react';
+import {
+  Home, ListTodo, Package, NotebookPen, Settings as SettingsIcon, type LucideIcon,
+} from 'lucide-react';
 import { watchAuth, watchMyHousehold, watchTasks, watchItems, watchRecords } from './lib/store';
 import Setup from './features/Setup';
 import Dashboard from './features/Dashboard';
@@ -14,15 +16,15 @@ type Tab = 'home' | 'tasks' | 'items' | 'records' | 'settings';
 
 const BASE_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'home', label: 'ホーム', icon: Home },
-  { id: 'tasks', label: 'やること', icon: ClipboardList },
-  { id: 'items', label: '準備品', icon: ShoppingBag },
+  { id: 'tasks', label: 'やること', icon: ListTodo },
+  { id: 'items', label: '準備品', icon: Package },
   { id: 'settings', label: '設定', icon: SettingsIcon },
 ];
 // 出生日登録後は「きろく」を最前列に（産後の主用途になるため）
 const POSTPARTUM_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
-  { id: 'records', label: 'きろく', icon: Baby },
+  { id: 'records', label: 'きろく', icon: NotebookPen },
   { id: 'home', label: 'ホーム', icon: Home },
-  { id: 'tasks', label: 'やること', icon: ClipboardList },
+  { id: 'tasks', label: 'やること', icon: ListTodo },
   { id: 'settings', label: '設定', icon: SettingsIcon },
 ];
 

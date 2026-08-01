@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Milk, Droplets, CircleDot, Moon, Sun, Bath, Thermometer, Scale, StickyNote, X,
+  Heart, Milk, Droplets, Droplet, Baby, Moon, Sun, Bath, Thermometer, Scale,
+  StickyNote, X, type LucideIcon,
 } from 'lucide-react';
 import type { Household, CareRecord, CareRecordType } from '../types';
 import { addRecord, removeRecord } from '../lib/store';
@@ -71,12 +72,12 @@ export default function Records({ household, records, uid }: {
 
       {/* ワンタップ記録グリッド */}
       <div className="mt-5 grid grid-cols-3 gap-2.5">
-        <QuickBtn icon={Milk} label="母乳 左" onTap={() => quickAdd('breast_l')} />
-        <QuickBtn icon={Milk} label="母乳 右" onTap={() => quickAdd('breast_r')} />
+        <QuickBtn icon={Heart} label="母乳 左" onTap={() => quickAdd('breast_l')} />
+        <QuickBtn icon={Heart} label="母乳 右" onTap={() => quickAdd('breast_r')} />
         <QuickBtn icon={Milk} label="ミルク" onTap={() => quickAdd('formula')} />
-        <QuickBtn icon={Droplets} label="おしっこ" onTap={() => quickAdd('pee')} />
-        <QuickBtn icon={CircleDot} label="うんち" onTap={() => quickAdd('poop')} />
-        <QuickBtn icon={Milk} label="搾乳" onTap={() => quickAdd('pump')} />
+        <QuickBtn icon={Droplet} label="おしっこ" onTap={() => quickAdd('pee')} />
+        <QuickBtn icon={Baby} label="うんち" onTap={() => quickAdd('poop')} />
+        <QuickBtn icon={Droplets} label="搾乳" onTap={() => quickAdd('pump')} />
         {sleeping ? (
           <QuickBtn icon={Sun} label="おきた" onTap={() => quickAdd('wake')} emph />
         ) : (
@@ -106,7 +107,7 @@ export default function Records({ household, records, uid }: {
 }
 
 function QuickBtn({ icon: Icon, label, onTap, emph }: {
-  icon: typeof Milk; label: string; onTap: () => void; emph?: boolean;
+  icon: LucideIcon; label: string; onTap: () => void; emph?: boolean;
 }) {
   return (
     <button
