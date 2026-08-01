@@ -13,12 +13,12 @@ describe('normalizeHouseholdProfile', () => {
     });
   });
 
-  it('旧形式で会社員ではない場合は保険区分を決めつけない', () => {
+  it('旧形式の育休falseは片方取得の可能性を残し、保険区分を決めつけない', () => {
     expect(normalizeHouseholdProfile({
       bothParentsLeave: false,
       motherIsEmployee: false,
     })).toEqual({
-      motherTakesLeave: false,
+      motherTakesLeave: true,
       partnerTakesLeave: false,
       motherInsurance: 'other',
     });

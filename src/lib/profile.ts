@@ -15,7 +15,8 @@ export function normalizeHouseholdProfile(
     ? 'other'
     : 'employee';
   return {
-    motherTakesLeave: profile?.motherTakesLeave ?? legacyBothLeave,
+    // 旧falseは「片方のみ」と「双方なし」を区別できないため、見落とし防止を優先する。
+    motherTakesLeave: profile?.motherTakesLeave ?? true,
     partnerTakesLeave: profile?.partnerTakesLeave ?? legacyBothLeave,
     motherInsurance: profile?.motherInsurance ?? legacyInsurance,
   };
