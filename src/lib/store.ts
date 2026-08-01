@@ -116,6 +116,45 @@ export function addPartner(householdId: string, partnerUid: string, partnerName:
   });
 }
 
+export interface HouseholdSettings {
+  name: string;
+  dueDate: string;
+  birthDate: string | null;
+  profile: HouseholdProfile;
+}
+
+/** 世帯設定を更新し、予定日・出生日・対象条件に依存するタスクを再計算する */
+export async function updateHouseholdSettings(
+  household: Household,
+  tasks: TaskInstance[],
+  settings: HouseholdSettings,
+): Promise<void> {
+  const templates = new Map(
+    (procedureMaster.templates as unknown as TaskTemplate[]).map((template) => [template.id, template]),
+  );
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'households', household.id), {
+    name: settings.name,
+    dueDate: settings.dueDate,
+    birthDate: settings.birthDate,
+    profile: settings.profile,
+  });
+
+  for (const task of tasks) {
+    const patch: Partial<TaskInstance> = {
+      dueDateResolved: resolveDueDate(task.trigger, settings.dueDate, settings.birthDate),
+    };
+    const template = task.templateId ? templates.get(task.templateId) : undefined;
+    if (template?.conditions) {
+      const applicable = matchesProfile(template.conditions, settings.profile);
+      if (!applicable) patch.status = 'na';
+      else if (task.status === 'na') patch.status = 'todo';
+    }
+    batch.update(doc(db, 'households', household.id, 'tasks', task.id), patch);
+  }
+  await batch.commit();
+}
+
 /** 出生イベント: 出生日を確定し、afterBirthタスクの期限を一括再計算（Phase 2） */
 export async function registerBirth(household: Household, tasks: TaskInstance[], birthDate: string) {
   const batch = writeBatch(db);

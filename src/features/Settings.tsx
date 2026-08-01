@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { User } from 'firebase/auth';
 import type { Household, TaskInstance, PurchaseItem } from '../types';
 import {
-  addPartner, registerBirth, logout, importBackup, deleteHouseholdData, loadAllRecords,
+  addPartner, updateHouseholdSettings, logout, importBackup, deleteHouseholdData, loadAllRecords,
 } from '../lib/store';
 import { exportIcs, exportJson } from '../lib/exporters';
 
@@ -13,6 +13,17 @@ export default function Settings({ user, household, tasks, items }: {
   const [partnerName, setPartnerName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [confirmBirth, setConfirmBirth] = useState(false);
+  const [editingHousehold, setEditingHousehold] = useState(false);
+  const [householdName, setHouseholdName] = useState(household.name);
+  const [dueDate, setDueDate] = useState(household.dueDate);
+  const [bothParentsLeave, setBothParentsLeave] = useState(
+    household.profile?.bothParentsLeave ?? true,
+  );
+  const [motherIsEmployee, setMotherIsEmployee] = useState(
+    household.profile?.motherIsEmployee ?? true,
+  );
+  const [savingHousehold, setSavingHousehold] = useState(false);
+  const [householdError, setHouseholdError] = useState<string | null>(null);
   const solo = household.memberUids.length < 2;
 
   return (
@@ -21,9 +32,102 @@ export default function Settings({ user, household, tasks, items }: {
 
       <section className="rounded-2xl bg-white p-5 border border-ink/10">
         <h2 className="font-display font-bold text-ink">世帯</h2>
-        <p className="mt-1 text-sm text-ink/60">
-          {household.name} ／ 予定日 {household.dueDate}
-        </p>
+        {!editingHousehold ? (
+          <>
+            <p className="mt-1 text-sm text-ink/60">
+              {household.name} ／ 予定日 {household.dueDate}
+            </p>
+            <p className="mt-1 text-xs text-ink/50">
+              夫婦とも育休: {household.profile?.bothParentsLeave ? '予定あり' : '予定なし'} ／
+              出産する側の出産手当金: {household.profile?.motherIsEmployee ? '対象候補' : '対象外'}
+            </p>
+            <button
+              onClick={() => {
+                setHouseholdName(household.name);
+                setDueDate(household.dueDate);
+                setBothParentsLeave(household.profile?.bothParentsLeave ?? true);
+                setMotherIsEmployee(household.profile?.motherIsEmployee ?? true);
+                setHouseholdError(null);
+                setEditingHousehold(true);
+              }}
+              className="mt-3 rounded-full border border-ink/15 px-4 py-2 text-sm font-bold text-ink"
+            >
+              世帯設定を変更
+            </button>
+          </>
+        ) : (
+          <div className="mt-3 space-y-3 rounded-xl bg-base p-4">
+            <label className="block text-sm text-ink/70">
+              世帯の名前
+              <input
+                value={householdName}
+                onChange={(event) => setHouseholdName(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5"
+              />
+            </label>
+            <label className="block text-sm text-ink/70">
+              出産予定日
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-ink/80">
+              <input
+                type="checkbox"
+                checked={bothParentsLeave}
+                onChange={(event) => setBothParentsLeave(event.target.checked)}
+              />
+              夫婦とも育休を取得する予定
+            </label>
+            <label className="flex items-center gap-2 text-sm text-ink/80">
+              <input
+                type="checkbox"
+                checked={motherIsEmployee}
+                onChange={(event) => setMotherIsEmployee(event.target.checked)}
+              />
+              出産する側が会社員・公務員（出産手当金の対象）
+            </label>
+            <p className="text-xs leading-relaxed text-ink/50">
+              予定日を変更すると期限を再計算します。対象条件が変わった手続きは「対象外」または「未着手」に更新します。
+            </p>
+            {householdError && <p className="text-sm text-alert">{householdError}</p>}
+            <div className="flex gap-2">
+              <button
+                disabled={savingHousehold}
+                onClick={() => setEditingHousehold(false)}
+                className="flex-1 rounded-full border border-ink/15 py-2.5 text-sm text-ink/60 disabled:opacity-40"
+              >
+                キャンセル
+              </button>
+              <button
+                disabled={!householdName.trim() || !dueDate || savingHousehold}
+                onClick={async () => {
+                  setSavingHousehold(true);
+                  setHouseholdError(null);
+                  try {
+                    await updateHouseholdSettings(household, tasks, {
+                      name: householdName.trim(),
+                      dueDate,
+                      birthDate: household.birthDate ?? null,
+                      profile: { bothParentsLeave, motherIsEmployee },
+                    });
+                    setEditingHousehold(false);
+                  } catch {
+                    setHouseholdError('世帯設定を保存できませんでした。もう一度お試しください。');
+                  } finally {
+                    setSavingHousehold(false);
+                  }
+                }}
+                className="flex-1 rounded-full bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-40"
+              >
+                {savingHousehold ? '保存中…' : '保存'}
+              </button>
+            </div>
+          </div>
+        )}
         <ul className="mt-2 text-sm text-ink/80">
           {household.memberUids.map((uid) => (
             <li key={uid}>・{household.memberNames[uid] ?? uid}{uid === user.uid && '（自分）'}</li>
@@ -59,53 +163,77 @@ export default function Settings({ user, household, tasks, items }: {
         )}
       </section>
 
-      {!household.birthDate && (
-        <section className="rounded-2xl border border-ink/25 bg-white p-5">
-          <h2 className="font-display font-bold text-ink">生まれたら</h2>
+      <section className="rounded-2xl border border-ink/25 bg-white p-5">
+        <h2 className="font-display font-bold text-ink">
+          {household.birthDate ? '出生日' : '生まれたら'}
+        </h2>
+        {household.birthDate && (
+          <p className="mt-1 text-xs leading-relaxed text-ink/60">
+            現在の出生日は {household.birthDate} です。訂正すると産後手続きの期限を再計算します。
+          </p>
+        )}
+        {!household.birthDate && (
           <p className="mt-1 text-xs leading-relaxed text-ink/60">
             出生日を登録すると、出生届（14日以内）・児童手当（15日以内）など
             すべての産後手続きの期限が確定します。
           </p>
-          <input
-            type="date"
-            value={birthDate}
-            onChange={(e) => setBirthDate(e.target.value)}
-            className="mt-3 w-full rounded-xl border border-accent/20 bg-base px-4 py-3"
-          />
-          {!confirmBirth ? (
-            <button
-              disabled={!birthDate}
-              onClick={() => setConfirmBirth(true)}
-              className="mt-3 w-full rounded-full bg-accent py-3 font-display font-bold text-white disabled:opacity-40"
-            >
-              出生日を登録する
-            </button>
-          ) : (
-            <div className="mt-3 space-y-2">
-              <p className="text-center text-sm text-ink">
-                {birthDate} で確定します。よろしいですか？
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirmBirth(false)}
-                  className="flex-1 rounded-full bg-base py-3 text-sm text-ink/60"
-                >
-                  戻る
-                </button>
-                <button
-                  onClick={async () => {
-                    await registerBirth(household, tasks, birthDate);
+        )}
+        <input
+          type="date"
+          value={birthDate}
+          onChange={(e) => setBirthDate(e.target.value)}
+          className="mt-3 w-full rounded-xl border border-accent/20 bg-base px-4 py-3"
+        />
+        {!confirmBirth ? (
+          <button
+            disabled={!birthDate}
+            onClick={() => setConfirmBirth(true)}
+            className="mt-3 w-full rounded-full bg-accent py-3 font-display font-bold text-white disabled:opacity-40"
+          >
+            {household.birthDate ? '出生日を訂正する' : '出生日を登録する'}
+          </button>
+        ) : (
+          <div className="mt-3 space-y-2">
+            <p className="text-center text-sm text-ink">
+              {birthDate} で確定し、産後手続きの期限を再計算します。よろしいですか？
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmBirth(false)}
+                className="flex-1 rounded-full bg-base py-3 text-sm text-ink/60"
+              >
+                戻る
+              </button>
+              <button
+                onClick={async () => {
+                  setSavingHousehold(true);
+                  try {
+                    await updateHouseholdSettings(household, tasks, {
+                      name: household.name,
+                      dueDate: household.dueDate,
+                      birthDate,
+                      profile: household.profile ?? {
+                        bothParentsLeave: true,
+                        motherIsEmployee: true,
+                      },
+                    });
+                    setBirthDate('');
                     setConfirmBirth(false);
-                  }}
-                  className="flex-1 rounded-full bg-accent py-3 font-bold text-white"
-                >
-                  おめでとう！確定
-                </button>
-              </div>
+                  } catch {
+                    alert('出生日を保存できませんでした');
+                  } finally {
+                    setSavingHousehold(false);
+                  }
+                }}
+                disabled={savingHousehold}
+                className="flex-1 rounded-full bg-accent py-3 font-bold text-white disabled:opacity-40"
+              >
+                {savingHousehold ? '保存中…' : '確定'}
+              </button>
             </div>
-          )}
-        </section>
-      )}
+          </div>
+        )}
+      </section>
 
       <section className="rounded-2xl bg-white p-5 border border-ink/10">
         <h2 className="font-display font-bold text-ink">エクスポート</h2>
