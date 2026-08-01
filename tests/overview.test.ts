@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   groupTasksByAssignee,
   categoryProgress,
+  purchaseDueDate,
   purchaseAlerts,
   sprintTasks,
 } from '../src/lib/overview';
@@ -104,6 +105,16 @@ describe('purchaseAlerts', () => {
     const alerts = purchaseAlerts(items, dueDate, '2026-07-19', '2026-07-20');
     expect(alerts).toHaveLength(1);
     expect(alerts[0].due).toBe('2026-07-22');
+  });
+
+  it('必要日の手動上書きを期限計算とアラートに優先する', () => {
+    const overridden = item({
+      id: 'overridden',
+      neededBy: { type: 'beforeDue', days: 7 },
+      neededByDateOverride: '2026-07-22',
+    });
+    expect(purchaseDueDate(overridden, dueDate, null)).toBe('2026-07-22');
+    expect(purchaseAlerts([overridden], dueDate, null, '2026-07-20')[0].due).toBe('2026-07-22');
   });
 });
 

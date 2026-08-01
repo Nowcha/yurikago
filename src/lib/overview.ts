@@ -48,6 +48,15 @@ export interface PurchaseAlert {
   urgency: Urgency;
 }
 
+/** 準備品の必要日。利用者の上書きがあればマスター計算より優先する */
+export function purchaseDueDate(
+  item: PurchaseItem,
+  dueDate: string,
+  birthDate: string | null | undefined,
+): string | null {
+  return item.neededByDateOverride ?? resolveDueDate(item.neededBy, dueDate, birthDate);
+}
+
 /**
  * 準備品の期限接近アラート。未完了かつ「産後様子見」でないもののうち、
  * 期限超過・7日以内のものを期限昇順で返す
@@ -61,7 +70,7 @@ export function purchaseAlerts(
   return items
     .filter((i) => i.status === 'todo' && !i.waitUntilBorn)
     .flatMap((item) => {
-      const due = resolveDueDate(item.neededBy, dueDate, birthDate);
+      const due = purchaseDueDate(item, dueDate, birthDate);
       if (!due) return [];
       const u = urgency(due, today);
       return u === 'overdue' || u === 'imminent' ? [{ item, due, urgency: u }] : [];

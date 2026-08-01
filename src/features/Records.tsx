@@ -4,7 +4,8 @@ import {
   StickyNote, X, Pencil, ChevronLeft, ChevronRight, type LucideIcon,
 } from 'lucide-react';
 import type { Household, CareRecord, CareRecordType } from '../types';
-import { addRecord, removeRecord, replaceRecord } from '../lib/store';
+import { addRecord, removeRecord, replaceRecord, watchRecordsForDay } from '../lib/store';
+import { summarizeCareDay } from '../lib/records';
 import { addDays, todayYmd } from '../lib/deadline';
 
 const TYPE_META: Record<CareRecordType, { label: string; needsValue?: 'ml' | 'temp' | 'weight' | 'text' }> = {
@@ -29,11 +30,33 @@ export default function Records({ household, records, uid }: {
 }) {
   const [pending, setPending] = useState<CareRecordType | null>(null);
   const [selectedDay, setSelectedDay] = useState(todayYmd());
+  const [dayRecords, setDayRecords] = useState<CareRecord[]>([]);
+  const [dayLoading, setDayLoading] = useState(true);
+  const [dayError, setDayError] = useState(false);
+  const [recordError, setRecordError] = useState<string | null>(null);
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick((n) => n + 1), 60_000); // 経過時間表示の更新
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    setDayLoading(true);
+    setDayError(false);
+    return watchRecordsForDay(
+      household.id,
+      selectedDay,
+      (nextRecords) => {
+        setDayRecords(nextRecords);
+        setDayLoading(false);
+      },
+      () => {
+        setDayRecords([]);
+        setDayError(true);
+        setDayLoading(false);
+      },
+    );
+  }, [household.id, selectedDay]);
 
   const lastFeeding = useMemo(
     () => records.find((r) => FEEDING.includes(r.type)),
@@ -45,11 +68,16 @@ export default function Records({ household, records, uid }: {
   );
   const sleeping = lastSleepState?.type === 'sleep';
 
-  const quickAdd = (type: CareRecordType) => {
+  const quickAdd = async (type: CareRecordType): Promise<void> => {
     if (TYPE_META[type].needsValue) {
       setPending(type);
-    } else {
-      addRecord(household.id, { type, at: Date.now(), by: uid });
+      return;
+    }
+    setRecordError(null);
+    try {
+      await addRecord(household.id, { type, at: Date.now(), by: uid });
+    } catch {
+      setRecordError('記録を保存できませんでした。もう一度お試しください。');
     }
   };
 
@@ -74,22 +102,23 @@ export default function Records({ household, records, uid }: {
 
       {/* ワンタップ記録グリッド */}
       <div className="mt-5 grid grid-cols-3 gap-2.5">
-        <QuickBtn icon={Heart} label="母乳 左" onTap={() => quickAdd('breast_l')} />
-        <QuickBtn icon={Heart} label="母乳 右" onTap={() => quickAdd('breast_r')} />
-        <QuickBtn icon={Milk} label="ミルク" onTap={() => quickAdd('formula')} />
-        <QuickBtn icon={Droplet} label="おしっこ" onTap={() => quickAdd('pee')} />
-        <QuickBtn icon={Baby} label="うんち" onTap={() => quickAdd('poop')} />
-        <QuickBtn icon={Droplets} label="搾乳" onTap={() => quickAdd('pump')} />
+        <QuickBtn icon={Heart} label="母乳 左" onTap={() => void quickAdd('breast_l')} />
+        <QuickBtn icon={Heart} label="母乳 右" onTap={() => void quickAdd('breast_r')} />
+        <QuickBtn icon={Milk} label="ミルク" onTap={() => void quickAdd('formula')} />
+        <QuickBtn icon={Droplet} label="おしっこ" onTap={() => void quickAdd('pee')} />
+        <QuickBtn icon={Baby} label="うんち" onTap={() => void quickAdd('poop')} />
+        <QuickBtn icon={Droplets} label="搾乳" onTap={() => void quickAdd('pump')} />
         {sleeping ? (
-          <QuickBtn icon={Sun} label="おきた" onTap={() => quickAdd('wake')} emph />
+          <QuickBtn icon={Sun} label="おきた" onTap={() => void quickAdd('wake')} emph />
         ) : (
-          <QuickBtn icon={Moon} label="ねた" onTap={() => quickAdd('sleep')} emph />
+          <QuickBtn icon={Moon} label="ねた" onTap={() => void quickAdd('sleep')} emph />
         )}
-        <QuickBtn icon={Bath} label="沐浴" onTap={() => quickAdd('bath')} />
-        <QuickBtn icon={Thermometer} label="体温" onTap={() => quickAdd('temp')} />
-        <QuickBtn icon={Scale} label="体重" onTap={() => quickAdd('weight')} />
-        <QuickBtn icon={StickyNote} label="メモ" onTap={() => quickAdd('memo')} />
+        <QuickBtn icon={Bath} label="沐浴" onTap={() => void quickAdd('bath')} />
+        <QuickBtn icon={Thermometer} label="体温" onTap={() => void quickAdd('temp')} />
+        <QuickBtn icon={Scale} label="体重" onTap={() => void quickAdd('weight')} />
+        <QuickBtn icon={StickyNote} label="メモ" onTap={() => void quickAdd('memo')} />
       </div>
+      {recordError && <p className="mt-3 text-sm text-alert">{recordError}</p>}
 
       <div className="mt-7 flex items-center gap-2">
         <button
@@ -103,7 +132,9 @@ export default function Records({ household, records, uid }: {
           type="date"
           value={selectedDay}
           max={todayYmd()}
-          onChange={(event) => setSelectedDay(event.target.value)}
+          onChange={(event) => {
+            if (event.target.value) setSelectedDay(event.target.value);
+          }}
           className="min-w-0 flex-1 rounded-full border border-ink/10 bg-white px-4 py-2.5 text-center text-sm text-ink"
           aria-label="表示する日"
         />
@@ -117,16 +148,22 @@ export default function Records({ household, records, uid }: {
         </button>
       </div>
 
-      <DayLog household={household} records={records} selectedDay={selectedDay} />
+      <DayLog
+        household={household}
+        records={dayRecords}
+        selectedDay={selectedDay}
+        loading={dayLoading}
+        hasError={dayError}
+      />
 
       {pending && (
         <ValueSheet
           type={pending}
           onClose={() => setPending(null)}
-          onSave={(payload) => {
-            addRecord(household.id, { type: pending, at: Date.now(), by: uid, ...payload });
-            setPending(null);
-          }}
+          onSave={(payload) => addRecord(
+            household.id,
+            { type: pending, at: Date.now(), by: uid, ...payload },
+          )}
         />
       )}
     </div>
@@ -149,25 +186,29 @@ function QuickBtn({ icon: Icon, label, onTap, emph }: {
   );
 }
 
-function DayLog({ household, records, selectedDay }: {
+function DayLog({ household, records, selectedDay, loading, hasError }: {
   household: Household;
   records: CareRecord[];
   selectedDay: string;
+  loading: boolean;
+  hasError: boolean;
 }) {
   const [editing, setEditing] = useState<CareRecord | null>(null);
-  const dayStart = new Date(`${selectedDay}T00:00:00`).getTime();
-  const dayEnd = new Date(`${addDays(selectedDay, 1)}T00:00:00`).getTime();
-  const dayRecords = records.filter((record) => record.at >= dayStart && record.at < dayEnd);
   const heading = selectedDay === todayYmd() ? 'きょうの記録' : `${selectedDay} の記録`;
 
   return (
     <section className="mt-7">
-      <h2 className="text-sm font-bold text-sub">{heading}（{dayRecords.length}件）</h2>
+      <h2 className="text-sm font-bold text-sub">{heading}（{records.length}件）</h2>
+      {!loading && !hasError && records.length > 0 && <DaySummary records={records} />}
       <ul className="mt-2 divide-y divide-ink/10 rounded-2xl border border-ink/10 bg-white">
-        {dayRecords.length === 0 && (
+        {loading && <li className="p-4 text-sm text-sub">読み込み中…</li>}
+        {!loading && hasError && (
+          <li className="p-4 text-sm text-alert">この日の記録を読み込めませんでした</li>
+        )}
+        {!loading && !hasError && records.length === 0 && (
           <li className="p-4 text-sm text-sub">まだ記録がありません</li>
         )}
-        {dayRecords.map((r) => (
+        {!loading && !hasError && records.map((r) => (
           <li key={r.id} className="flex items-center justify-between p-3.5">
             <div className="flex items-baseline gap-3">
               <span className="w-11 font-mono text-xs text-sub">{hhmm(r.at)}</span>
@@ -188,9 +229,13 @@ function DayLog({ household, records, selectedDay }: {
                 <Pencil size={16} />
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (confirm(`${hhmm(r.at)} の「${TYPE_META[r.type].label}」を削除しますか？`)) {
-                    removeRecord(household.id, r.id);
+                    try {
+                      await removeRecord(household.id, r.id);
+                    } catch {
+                      alert('記録を削除できませんでした');
+                    }
                   }
                 }}
                 className="p-1.5 text-ink/30"
@@ -210,6 +255,26 @@ function DayLog({ household, records, selectedDay }: {
         />
       )}
     </section>
+  );
+}
+
+function DaySummary({ records }: { records: CareRecord[] }) {
+  const summary = summarizeCareDay(records);
+  const rows = [
+    ['授乳記録', `${summary.feedingCount}回`],
+    ['ミルク', `${summary.formulaMl}ml`],
+    ['おしっこ', `${summary.peeCount}回`],
+    ['うんち', `${summary.poopCount}回`],
+  ];
+  return (
+    <dl className="mt-2 grid grid-cols-4 divide-x divide-ink/10 rounded-xl border border-ink/10 bg-white py-3 text-center">
+      {rows.map(([label, value]) => (
+        <div key={label} className="min-w-0 px-1">
+          <dt className="truncate text-[10px] text-ink/45">{label}</dt>
+          <dd className="mt-0.5 font-display text-sm font-bold text-ink">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -307,10 +372,12 @@ function RecordEditSheet({ record, householdId, onClose }: {
 
 function ValueSheet({ type, onSave, onClose }: {
   type: CareRecordType;
-  onSave: (p: Partial<CareRecord>) => void;
+  onSave: (p: Partial<CareRecord>) => Promise<void>;
   onClose: () => void;
 }) {
   const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const kind = TYPE_META[type].needsValue!;
   const config = {
     ml: { label: 'ミルク量（ml）', input: 'number', placeholder: '80' },
@@ -319,12 +386,23 @@ function ValueSheet({ type, onSave, onClose }: {
     text: { label: 'メモ', input: 'text', placeholder: '' },
   }[kind];
 
-  const save = () => {
+  const save = async (): Promise<void> => {
     if (!value.trim()) return;
-    if (kind === 'ml') onSave({ amountMl: Number(value) });
-    else if (kind === 'temp') onSave({ temperature: Number(value) });
-    else if (kind === 'weight') onSave({ weightG: Number(value) });
-    else onSave({ note: value.trim() });
+    const payload: Partial<CareRecord> = {};
+    if (kind === 'ml') payload.amountMl = Number(value);
+    else if (kind === 'temp') payload.temperature = Number(value);
+    else if (kind === 'weight') payload.weightG = Number(value);
+    else payload.note = value.trim();
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(payload);
+      onClose();
+    } catch {
+      setError('記録を保存できませんでした。');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -343,16 +421,19 @@ function ValueSheet({ type, onSave, onClose }: {
           inputMode={kind === 'text' ? 'text' : 'decimal'}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && save()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void save();
+          }}
           placeholder={config.placeholder}
           className="mt-3 w-full rounded-xl border border-ink/15 bg-base px-4 py-3.5 text-lg"
         />
+        {error && <p className="mt-3 text-sm text-alert">{error}</p>}
         <button
-          onClick={save}
-          disabled={!value.trim()}
+          onClick={() => void save()}
+          disabled={saving || !value.trim()}
           className="mt-4 w-full rounded-full bg-accent py-3.5 font-display font-bold text-white disabled:opacity-40"
         >
-          記録する
+          {saving ? '保存中…' : '記録する'}
         </button>
       </div>
     </div>
