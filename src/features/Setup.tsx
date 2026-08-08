@@ -18,8 +18,15 @@ function describeAuthError(error: unknown): string | null {
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
       return null; // 自分でポップアップを閉じただけなのでエラー表示不要
+    case 'auth/operation-not-supported-in-this-environment':
+      return 'この画面ではログインできません。ホーム画面のアイコンではなく、SafariまたはChromeで開き直してください。';
+    case 'auth/network-request-failed':
+      return '通信に失敗しました。電波状況を確認してもう一度お試しください。';
     default:
-      return 'ログインに失敗しました。もう一度お試しください。';
+      // 原因の切り分けにはコードが要る。未知のコードは必ず画面に出す
+      return code
+        ? `ログインに失敗しました（${code}）。この画面をそのまま共有してください。`
+        : 'ログインに失敗しました。もう一度お試しください。';
   }
 }
 
