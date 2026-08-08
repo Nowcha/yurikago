@@ -6,7 +6,7 @@ import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, query, where, onSnapshot, writeBatch, updateDoc, setDoc,
   arrayUnion, deleteDoc, deleteField, orderBy, limit, getDocs, documentId, startAfter,
-  type Unsubscribe,
+  type Unsubscribe, type FirestoreError,
 } from 'firebase/firestore';
 import type {
   Household, HouseholdProfile, TaskInstance, TaskTemplate, PurchaseItem, PurchaseCategory,
@@ -49,13 +49,21 @@ export function logout() {
 }
 
 // ── Household ────────────────────────────────────────────────
-export function watchMyHousehold(uid: string, cb: (h: Household | null) => void) {
+/**
+ * 購読の失敗ハンドラ。省略するとonSnapshotは無音で止まり、
+ * 呼び出し側は「読み込み中」から永久に抜けられなくなるため必須扱いにする
+ */
+export type WatchErrorHandler = (error: FirestoreError) => void;
+
+export function watchMyHousehold(
+  uid: string, cb: (h: Household | null) => void, onError: WatchErrorHandler,
+) {
   const q = query(collection(db, 'households'), where('memberUids', 'array-contains', uid));
   return onSnapshot(q, (snap) => {
     if (snap.empty) return cb(null);
     const d = snap.docs[0];
     cb({ id: d.id, ...(d.data() as Omit<Household, 'id'>) });
-  });
+  }, onError);
 }
 
 /** テンプレートのconditionsをプロファイルで評価。未知の条件は通す（安全側=タスクを出す） */
@@ -190,10 +198,12 @@ export async function registerBirth(household: Household, tasks: TaskInstance[],
 }
 
 // ── Tasks ────────────────────────────────────────────────────
-export function watchTasks(householdId: string, cb: (tasks: TaskInstance[]) => void) {
+export function watchTasks(
+  householdId: string, cb: (tasks: TaskInstance[]) => void, onError: WatchErrorHandler,
+) {
   return onSnapshot(collection(db, 'households', householdId, 'tasks'), (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<TaskInstance, 'id'>) })));
-  });
+  }, onError);
 }
 export function updateTask(householdId: string, taskId: string, patch: Partial<TaskInstance>) {
   return updateDoc(doc(db, 'households', householdId, 'tasks', taskId), patch);
@@ -228,10 +238,12 @@ export function removeTask(householdId: string, taskId: string) {
 }
 
 // ── Purchase items ───────────────────────────────────────────
-export function watchItems(householdId: string, cb: (items: PurchaseItem[]) => void) {
+export function watchItems(
+  householdId: string, cb: (items: PurchaseItem[]) => void, onError: WatchErrorHandler,
+) {
   return onSnapshot(collection(db, 'households', householdId, 'items'), (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<PurchaseItem, 'id'>) })));
-  });
+  }, onError);
 }
 export function updateItem(householdId: string, itemId: string, patch: Partial<PurchaseItem>) {
   return updateDoc(doc(db, 'households', householdId, 'items', itemId), patch);
@@ -458,14 +470,16 @@ export async function loadAllRecords(householdId: string): Promise<CareRecord[]>
 }
 
 /** 画面表示用に直近の記録を購読（新しい順・約1か月分を想定） */
-export function watchRecords(householdId: string, cb: (records: CareRecord[]) => void) {
+export function watchRecords(
+  householdId: string, cb: (records: CareRecord[]) => void, onError: WatchErrorHandler,
+) {
   const q = query(
     collection(db, 'households', householdId, 'records'),
     orderBy('at', 'desc'), limit(1000),
   );
   return onSnapshot(q, (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CareRecord, 'id'>) })));
-  });
+  }, onError);
 }
 /** 選択日と前日の記録を件数制限なしで購読する。前日分は日またぎ睡眠の集計に使う。 */
 export function watchRecordsForDay(

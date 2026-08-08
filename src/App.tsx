@@ -36,22 +36,29 @@ export default function App() {
   const [items, setItems] = useState<PurchaseItem[]>([]);
   const [records, setRecords] = useState<CareRecord[]>([]);
   const [tab, setTab] = useState<Tab>('home');
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => watchAuth(setUser), []);
 
   useEffect(() => {
     if (!user) { setHousehold(user === null ? null : undefined); return; }
-    return watchMyHousehold(user.uid, setHousehold);
+    setSyncError(null);
+    return watchMyHousehold(user.uid, setHousehold, (e) => setSyncError(e.code));
   }, [user]);
 
   useEffect(() => {
     if (!household) { setTasks([]); setItems([]); return; }
-    const u1 = watchTasks(household.id, setTasks);
-    const u2 = watchItems(household.id, setItems);
-    const u3 = household.birthDate ? watchRecords(household.id, setRecords) : undefined;
+    const onError = (e: { code: string }) => setSyncError(e.code);
+    const u1 = watchTasks(household.id, setTasks, onError);
+    const u2 = watchItems(household.id, setItems, onError);
+    const u3 = household.birthDate
+      ? watchRecords(household.id, setRecords, onError)
+      : undefined;
     return () => { u1(); u2(); u3?.(); };
   }, [household?.id, household?.birthDate]);
 
+  // 購読が失敗すると以降コールバックは来ない。スプラッシュのまま放置せず理由を出す
+  if (syncError) return <SyncErrorScreen code={syncError} />;
   if (user === undefined || (user && household === undefined)) {
     return <Splash message="読み込み中…" />;
   }
@@ -101,6 +108,25 @@ function Splash({ message }: { message: string }) {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-base">
       <p className="font-display text-accent">{message}</p>
+    </div>
+  );
+}
+
+function SyncErrorScreen({ code }: { code: string }) {
+  return (
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-4 bg-base px-6 text-center">
+      <p className="font-display text-lg font-bold text-ink">データを読み込めませんでした</p>
+      <p className="text-sm leading-relaxed text-ink/70">
+        通信が不安定か、この世帯へのアクセス権がない可能性があります。
+        解決しない場合はこのコードをそのまま共有してください。
+      </p>
+      <p className="rounded-xl bg-alert/10 px-4 py-2 font-mono text-sm text-alert">{code}</p>
+      <button
+        onClick={() => window.location.reload()}
+        className="rounded-full border border-ink px-6 py-3 font-display font-bold text-ink active:scale-95"
+      >
+        もう一度読み込む
+      </button>
     </div>
   );
 }
