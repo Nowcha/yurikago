@@ -5,11 +5,14 @@ import type {
 import { todayYmd, urgency } from '../lib/deadline';
 import { Flag } from 'lucide-react';
 import {
-  updateTask, addTask, removeTask, setTaskDueDate, clearTaskAssignee,
+  updateTask, addTask, removeTask, restoreTask, setTaskDueDate, clearTaskAssignee,
 } from '../lib/store';
 import { AssigneeBadge } from './Dashboard';
 import { CATEGORY_LABEL, AUTHORITY_LABEL, assigneeLabel } from '../lib/labels';
 import { taskDateBounds } from '../lib/dateBounds';
+import Sheet from '../components/Sheet';
+import { useToast } from '../components/Toast';
+import { describeWriteError } from '../lib/sync';
 
 const TASK_DATE_BOUNDS = taskDateBounds();
 
@@ -214,26 +217,25 @@ const ASSIGNEE_OPTIONS: { value: Assignee; label: (h: Household) => string }[] =
 function TaskSheet({ task, household, onClose }: {
   task: TaskInstance; household: Household; onClose: () => void;
 }) {
-  const patch = (p: Partial<TaskInstance>) => updateTask(household.id, task.id, p);
+  const { notify, notifyWithAction } = useToast();
+  // 状態や担当の変更が失敗しても無言だった。結果は必ず返す
+  const patch = (p: Partial<TaskInstance>) => {
+    void updateTask(household.id, task.id, p)
+      .catch((error: unknown) => notify(describeWriteError(error)));
+  };
   const [title, setTitle] = useState(task.title);
   const [category, setCategory] = useState<TaskCategory>(task.category);
   const [dueDate, setDueDate] = useState(task.dueDateOverride ?? task.dueDateResolved ?? '');
   const [savingDetails, setSavingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   return (
-    <div className="fixed inset-0 z-10 flex items-end bg-ink/40" onClick={onClose}>
-      <div
-        className="max-h-[85dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 pb-10"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/15" />
-        <h2 className="font-display text-lg font-bold text-ink">{task.title}</h2>
-        {task.dueDateResolved && (
-          <p className="mt-1 text-sm text-sub">
-            期限 {task.dueDateResolved}
-            {task.deadline === 'hard' && <span className="ml-1 text-alert">（法定）</span>}
-          </p>
-        )}
+    <Sheet title={task.title} onClose={onClose}>
+      {task.dueDateResolved && (
+        <p className="mt-1 text-sm text-sub">
+          期限 {task.dueDateResolved}
+          {task.deadline === 'hard' && <span className="ml-1 text-alert">（法定）</span>}
+        </p>
+      )}
 
         <div className="mt-4 space-y-3 rounded-xl bg-base p-4">
           {!task.templateId && (
@@ -339,7 +341,10 @@ function TaskSheet({ task, household, onClose }: {
           ))}
           {task.assignee && (
             <button
-              onClick={() => clearTaskAssignee(household.id, task.id)}
+              onClick={() => {
+                void clearTaskAssignee(household.id, task.id)
+                  .catch((error: unknown) => notify(describeWriteError(error)));
+              }}
               className="rounded-full bg-base px-3 py-2 text-sm text-sub"
             >
               解除
@@ -392,13 +397,24 @@ function TaskSheet({ task, household, onClose }: {
 
         {!task.templateId && (
           <button
-            onClick={() => {
-              if (confirm('このタスクを削除しますか？')) {
-                removeTask(household.id, task.id);
-                onClose();
+            onClick={async () => {
+              // 確認より取り消しの方が速い。先に消してから取り消し口を出す
+              const snapshot = task;
+              onClose();
+              try {
+                await removeTask(household.id, task.id);
+                notifyWithAction(`「${snapshot.title}」を削除しました`, {
+                  label: '取り消す',
+                  run: () => {
+                    void restoreTask(household.id, snapshot)
+                      .catch((error: unknown) => notify(describeWriteError(error)));
+                  },
+                });
+              } catch (error: unknown) {
+                notify(describeWriteError(error));
               }
             }}
-            className="mt-5 w-full rounded-full bg-alert/10 py-2.5 text-sm font-bold text-alert"
+            className="mt-5 w-full rounded-full bg-alert/10 py-2.5 text-sm font-bold text-alert hover:bg-alert/20"
           >
             タスクを削除
           </button>
@@ -413,8 +429,7 @@ function TaskSheet({ task, household, onClose }: {
             className="mt-1.5 w-full rounded-xl border border-accent/20 bg-base p-3 text-sm"
           />
         </label>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 
