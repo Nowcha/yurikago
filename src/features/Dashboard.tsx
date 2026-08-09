@@ -48,7 +48,7 @@ export default function Dashboard({
               <p className="mt-3 font-display text-2xl font-bold text-ink">
                 生後 {diffDays(household.birthDate!, today)} 日
               </p>
-              <p className="mt-1 text-sm text-ink/60">出生日 {household.birthDate}</p>
+              <p className="mt-1 text-sm text-sub">出生日 {household.birthDate}</p>
             </>
           ) : (
             <>
@@ -57,7 +57,7 @@ export default function Dashboard({
                 <span className="text-xl">週</span> {day}
                 <span className="text-xl">日</span>
               </p>
-              <p className="mt-2 text-sm text-ink/60">
+              <p className="mt-2 text-sm text-sub">
                 予定日 {household.dueDate} まで{' '}
                 <span className="font-display text-lg font-bold text-accent">
                   {remaining >= 0 ? `あと${remaining}日` : `${-remaining}日経過`}
@@ -86,10 +86,16 @@ export default function Dashboard({
       <section>
         <div className="flex items-baseline justify-between">
           <h2 className="font-display font-bold text-ink">今週やること</h2>
-          <button onClick={onGoTasks} className="text-sm text-accent">すべて見る →</button>
+          {/* 装飾色を持たないので、下線がリンクである唯一の手がかりになる */}
+          <button
+            onClick={onGoTasks}
+            className="-m-2 p-2 text-sm text-accent underline decoration-ink/25 underline-offset-4 hover:decoration-ink"
+          >
+            すべて見る →
+          </button>
         </div>
         {imminent.length === 0 ? (
-          <p className="mt-3 rounded-2xl bg-white p-5 text-sm text-ink/60">
+          <p className="mt-3 rounded-2xl bg-white p-5 text-sm text-sub">
             7日以内の期限はありません。ひと息つきましょう。
           </p>
         ) : (
@@ -99,18 +105,18 @@ export default function Dashboard({
 
       <section className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-white p-4 border border-ink/10">
-          <p className="text-xs text-ink/50">タスク進捗</p>
+          <p className="text-xs text-sub">タスク進捗</p>
           <p className="mt-1 font-display text-2xl font-bold text-accent">{progress}%</p>
           <div className="mt-2 h-1.5 rounded-full bg-base">
             <div className="h-full rounded-full bg-accent" style={{ width: `${progress}%` }} />
           </div>
         </div>
         <div className="rounded-2xl bg-white p-4 border border-ink/10">
-          <p className="text-xs text-ink/50">準備品の予算</p>
+          <p className="text-xs text-sub">準備品の予算</p>
           <p className="mt-1 font-display text-2xl font-bold text-sub">
             ¥{spent.toLocaleString()}
           </p>
-          <p className="text-xs text-ink/50">/ ¥{budget.toLocaleString()}</p>
+          <p className="text-xs text-sub">/ ¥{budget.toLocaleString()}</p>
         </div>
       </section>
 
@@ -132,14 +138,14 @@ function AssigneeSections({ tasks, household }: {
         if (list.length === 0) return null;
         return (
           <div key={key}>
-            <h3 className="text-xs font-bold tracking-wide text-ink/50">
+            <h3 className="text-xs font-bold tracking-wide text-sub">
               {assigneeLabel(key, household)}
             </h3>
             <ul className="mt-1.5 space-y-2">
               {list.map((t) => (
                 <li key={t.id} className="rounded-2xl bg-white p-4 border border-ink/10">
                   <p className="font-medium text-ink">{t.title}</p>
-                  <p className="text-xs text-ink/50">
+                  <p className="text-xs text-sub">
                     {t.dueDateResolved}まで
                     {t.deadline === 'hard' && (
                       <span className="ml-1 rounded bg-alert/10 px-1.5 py-0.5 text-alert">法定</span>
@@ -160,7 +166,7 @@ function CategoryProgressCard({ tasks }: { tasks: TaskInstance[] }) {
   if (rows.length === 0) return null;
   return (
     <section className="rounded-2xl bg-white p-4 border border-ink/10">
-      <p className="text-xs text-ink/50">カテゴリ別進捗</p>
+      <p className="text-xs text-sub">カテゴリ別進捗</p>
       <ul className="mt-3 space-y-2.5">
         {rows.map((r) => {
           const pct = r.total > 0 ? Math.round((r.done / r.total) * 100) : 0;
@@ -168,7 +174,7 @@ function CategoryProgressCard({ tasks }: { tasks: TaskInstance[] }) {
             <li key={r.category}>
               <div className="flex items-baseline justify-between text-xs">
                 <span className="font-medium text-ink">{CATEGORY_LABEL[r.category]}</span>
-                <span className="text-ink/50">{r.done}/{r.total}</span>
+                <span className="text-sub">{r.done}/{r.total}</span>
               </div>
               <div className="mt-1 h-1.5 rounded-full bg-base">
                 <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
@@ -194,7 +200,7 @@ function SprintSection({ tasks, today, onGoTasks }: {
         <h2 className="font-display font-bold text-ink">産後2週間スプリント</h2>
         <button onClick={onGoTasks} className="text-sm text-accent">すべて見る →</button>
       </div>
-      <p className="mt-1 text-xs text-ink/50">
+      <p className="mt-1 text-xs text-sub">
         のこり {remaining.length} 件。出生届などの法定期限を最優先で。
       </p>
       <ul className="mt-3 space-y-2">
@@ -212,7 +218,7 @@ function SprintSection({ tasks, today, onGoTasks }: {
                 <p className={`truncate text-sm font-medium text-ink ${closed ? 'line-through' : ''}`}>
                   {t.title}
                 </p>
-                <p className="text-xs text-ink/50">
+                <p className="text-xs text-sub">
                   {t.dueDateResolved ?? '期限未定'}
                   {t.deadline === 'hard' && (
                     <span className="ml-1 rounded bg-alert/10 px-1.5 py-0.5 text-alert">法定</span>
@@ -255,13 +261,13 @@ function WeekInfoCard({ week }: { week: number }) {
   return (
     <section className="rounded-2xl bg-white p-5 border border-ink/10">
       <h2 className="font-display font-bold text-ink">
-        今週の赤ちゃん <span className="text-sm font-normal text-ink/50">目安 {info.babySize}</span>
+        今週の赤ちゃん <span className="text-sm font-normal text-sub">目安 {info.babySize}</span>
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink/80">{info.babyNote}</p>
       <p className="mt-2 rounded-xl bg-surface p-3 text-sm leading-relaxed text-accent">
         {info.momNote}
       </p>
-      <p className="mt-2 text-[10px] text-ink/40">
+      <p className="mt-2 text-[10px] text-sub">
         一般的な目安です。体調・検査はかかりつけ医の指示を優先してください
       </p>
     </section>

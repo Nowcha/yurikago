@@ -8,6 +8,10 @@ import {
 import { withServerAck, describeWriteError } from '../lib/sync';
 import { exportIcs, exportJson } from '../lib/exporters';
 import { normalizeHouseholdProfile } from '../lib/profile';
+import { dueDateBounds, birthDateBounds } from '../lib/dateBounds';
+
+const DUE_DATE_BOUNDS = dueDateBounds();
+const BIRTH_DATE_BOUNDS = birthDateBounds();
 
 const INSURANCE_LABELS: Record<MotherInsurance, string> = {
   employee: '会社員・公務員の健康保険',
@@ -52,10 +56,10 @@ export default function Settings({ user, household, tasks, items }: {
         <h2 className="font-display font-bold text-ink">世帯</h2>
         {!editingHousehold ? (
           <>
-            <p className="mt-1 text-sm text-ink/60">
+            <p className="mt-1 text-sm text-sub">
               {household.name} ／ 予定日 {household.dueDate}
             </p>
-            <p className="mt-1 text-xs text-ink/50">
+            <p className="mt-1 text-xs text-sub">
               出産する側の育休: {normalizedProfile.motherTakesLeave ? '予定あり' : '予定なし'} ／
               パートナーの育休: {normalizedProfile.partnerTakesLeave ? '予定あり' : '予定なし'}
               <br />
@@ -71,7 +75,7 @@ export default function Settings({ user, household, tasks, items }: {
                 setHouseholdError(null);
                 setEditingHousehold(true);
               }}
-              className="mt-3 rounded-full border border-ink/15 px-4 py-2 text-sm font-bold text-ink"
+              className="mt-3 rounded-full border border-ink/15 hover:bg-surface px-4 py-2 text-sm font-bold text-ink"
             >
               世帯設定を変更
             </button>
@@ -91,6 +95,8 @@ export default function Settings({ user, household, tasks, items }: {
               <input
                 type="date"
                 value={dueDate}
+                min={DUE_DATE_BOUNDS.min}
+                max={DUE_DATE_BOUNDS.max}
                 onChange={(event) => setDueDate(event.target.value)}
                 className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5"
               />
@@ -123,7 +129,7 @@ export default function Settings({ user, household, tasks, items }: {
                 ))}
               </select>
             </label>
-            <p className="text-xs leading-relaxed text-ink/50">
+            <p className="text-xs leading-relaxed text-sub">
               予定日を変更すると期限を再計算します。対象条件が変わった手続きは「対象外」または「未着手」に更新します。
             </p>
             {householdError && <p className="text-sm text-alert">{householdError}</p>}
@@ -131,7 +137,7 @@ export default function Settings({ user, household, tasks, items }: {
               <button
                 disabled={savingHousehold}
                 onClick={() => setEditingHousehold(false)}
-                className="flex-1 rounded-full border border-ink/15 py-2.5 text-sm text-ink/60 disabled:opacity-40"
+                className="flex-1 rounded-full border border-ink/15 hover:bg-surface py-2.5 text-sm text-sub disabled:opacity-40"
               >
                 キャンセル
               </button>
@@ -154,7 +160,7 @@ export default function Settings({ user, household, tasks, items }: {
                     setSavingHousehold(false);
                   }
                 }}
-                className="flex-1 rounded-full bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-40"
+                className="flex-1 rounded-full bg-accent hover:bg-ink/85 py-2.5 text-sm font-bold text-white disabled:opacity-40"
               >
                 {savingHousehold ? '保存中…' : '保存'}
               </button>
@@ -170,7 +176,7 @@ export default function Settings({ user, household, tasks, items }: {
                   {uid === user.uid && '（自分）'}
                 </p>
                 {/* 登録したIDが相手のものと一致しているかはここでしか照合できない */}
-                <p className="break-all font-mono text-[11px] leading-tight text-ink/40">{uid}</p>
+                <p className="break-all font-mono text-[11px] leading-tight text-sub">{uid}</p>
               </div>
               {uid !== user.uid && (
                 <button
@@ -188,10 +194,10 @@ export default function Settings({ user, household, tasks, items }: {
                       setMemberBusy(false);
                     }
                   }}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs disabled:opacity-40 ${
+                  className={`flex min-h-11 shrink-0 items-center rounded-full border px-3.5 text-xs disabled:opacity-40 ${
                     confirmRemoveUid === uid
                       ? 'border-alert bg-alert/10 font-bold text-alert'
-                      : 'border-ink/15 text-ink/50'
+                      : 'border-ink/15 text-sub'
                   }`}
                 >
                   {confirmRemoveUid === uid ? '本当に解除' : '解除'}
@@ -203,7 +209,7 @@ export default function Settings({ user, household, tasks, items }: {
         {solo ? (
           <div className="mt-4 rounded-xl bg-base p-4">
             <p className="text-sm font-bold text-ink">パートナーを追加</p>
-            <p className="mt-1 text-xs leading-relaxed text-ink/60">
+            <p className="mt-1 text-xs leading-relaxed text-sub">
               パートナーが同じURLでGoogleログインすると、初期画面に本人のIDが表示されます。
               「タップしてコピー」で写して、そのまま貼り付けてください（28文字・手入力は不可）。
             </p>
@@ -244,13 +250,13 @@ export default function Settings({ user, household, tasks, items }: {
                   setMemberBusy(false);
                 }
               }}
-              className="mt-3 w-full rounded-full bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-40"
+              className="mt-3 w-full rounded-full bg-accent hover:bg-ink/85 py-2.5 text-sm font-bold text-white disabled:opacity-40"
             >
               {memberBusy ? '保存中…' : '追加する'}
             </button>
           </div>
         ) : (
-          <p className="mt-3 text-xs leading-relaxed text-ink/50">
+          <p className="mt-3 text-xs leading-relaxed text-sub">
             相手の画面が切り替わらないときは、上のIDが相手の画面に出ているIDと一致しているか
             確認してください。違っていれば「解除」して登録し直せます。
           </p>
@@ -267,12 +273,12 @@ export default function Settings({ user, household, tasks, items }: {
           {household.birthDate ? '出生日' : '生まれたら'}
         </h2>
         {household.birthDate && (
-          <p className="mt-1 text-xs leading-relaxed text-ink/60">
+          <p className="mt-1 text-xs leading-relaxed text-sub">
             現在の出生日は {household.birthDate} です。訂正すると産後手続きの期限を再計算します。
           </p>
         )}
         {!household.birthDate && (
-          <p className="mt-1 text-xs leading-relaxed text-ink/60">
+          <p className="mt-1 text-xs leading-relaxed text-sub">
             出生日を登録すると、出生届（14日以内）・児童手当（15日以内）など
             すべての産後手続きの期限が確定します。
           </p>
@@ -280,6 +286,8 @@ export default function Settings({ user, household, tasks, items }: {
         <input
           type="date"
           value={birthDate}
+          min={BIRTH_DATE_BOUNDS.min}
+          max={BIRTH_DATE_BOUNDS.max}
           onChange={(e) => setBirthDate(e.target.value)}
           className="mt-3 w-full rounded-xl border border-accent/20 bg-base px-4 py-3"
         />
@@ -287,7 +295,7 @@ export default function Settings({ user, household, tasks, items }: {
           <button
             disabled={!birthDate}
             onClick={() => setConfirmBirth(true)}
-            className="mt-3 w-full rounded-full bg-accent py-3 font-display font-bold text-white disabled:opacity-40"
+            className="mt-3 w-full rounded-full bg-accent hover:bg-ink/85 py-3 font-display font-bold text-white disabled:opacity-40"
           >
             {household.birthDate ? '出生日を訂正する' : '出生日を登録する'}
           </button>
@@ -299,7 +307,7 @@ export default function Settings({ user, household, tasks, items }: {
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirmBirth(false)}
-                className="flex-1 rounded-full bg-base py-3 text-sm text-ink/60"
+                className="flex-1 rounded-full bg-base py-3 text-sm text-sub"
               >
                 戻る
               </button>
@@ -322,7 +330,7 @@ export default function Settings({ user, household, tasks, items }: {
                   }
                 }}
                 disabled={savingHousehold}
-                className="flex-1 rounded-full bg-accent py-3 font-bold text-white disabled:opacity-40"
+                className="flex-1 rounded-full bg-accent hover:bg-ink/85 py-3 font-bold text-white disabled:opacity-40"
               >
                 {savingHousehold ? '保存中…' : '確定'}
               </button>
@@ -333,7 +341,7 @@ export default function Settings({ user, household, tasks, items }: {
 
       <section className="rounded-2xl bg-white p-5 border border-ink/10">
         <h2 className="font-display font-bold text-ink">初期データ</h2>
-        <p className="mt-1 text-xs leading-relaxed text-ink/60">
+        <p className="mt-1 text-xs leading-relaxed text-sub">
           江東区・東京都・国の最新マスターから不足している手続きと準備品を追加し、制度説明を更新します。完了状態・担当・メモ・実費・上書き期限は保持します。
         </p>
         <button
@@ -349,7 +357,7 @@ export default function Settings({ user, household, tasks, items }: {
               setSyncingMaster(false);
             }
           }}
-          className="mt-3 w-full rounded-full border border-ink/15 py-3 text-sm font-bold text-ink disabled:opacity-40"
+          className="mt-3 w-full rounded-full border border-ink/15 hover:bg-surface py-3 text-sm font-bold text-ink disabled:opacity-40"
         >
           {syncingMaster ? '更新中…' : '初期データを最新版に更新'}
         </button>
@@ -404,7 +412,7 @@ export default function Settings({ user, household, tasks, items }: {
               }}
             />
           </label>
-          <p className="text-xs text-ink/50">
+          <p className="text-xs text-sub">
             JSONはClaude Codeの分析コマンドの入力にも使えます
           </p>
         </div>
@@ -428,7 +436,7 @@ export default function Settings({ user, household, tasks, items }: {
         </button>
       </section>
 
-      <button onClick={() => logout()} className="w-full py-3 text-sm text-ink/40">
+      <button onClick={() => logout()} className="w-full py-3 text-sm text-sub">
         ログアウト
       </button>
     </div>

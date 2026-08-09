@@ -10,7 +10,7 @@
   --color-surface: #F1F1F1;   /* 面（チップ・入力欄） */
   --color-ink: #1A1A1A;       /* 文字・主要色 */
   --color-accent: #1A1A1A;    /* アクション（=墨色） */
-  --color-sub: #767676;       /* 補助テキスト・中間強調 */
+  --color-sub: #6E6E6E;       /* 補助テキスト。base(#FAFAFA)上でも4.5:1を満たす最も明るい値 */
   --color-alert: #D64545;     /* 法定期限・破壊的操作のみ */
   --font-display: "Noto Sans JP", system-ui, sans-serif;
   --font-sans: "Noto Sans JP", system-ui, sans-serif;
@@ -19,6 +19,28 @@
 html { -webkit-tap-highlight-color: transparent; }
 body { background: var(--color-base); color: var(--color-ink); }
 input, textarea, button { font-family: inherit; }
+
+/*
+ * インタラクションの基礎。装飾色を足さない方針なので、「押せる」ことは
+ * カーソル・地の変化・フォーカスリングだけで示す。
+ * PCではポインタに反応しないと押せる場所が判別できないため hover を必ず持たせる。
+ */
+button:not(:disabled), select, summary, a[href], label:has(input[type="checkbox"]) {
+  cursor: pointer;
+}
+button:disabled { cursor: not-allowed; }
+
+:where(button, a, select, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled), a[href] {
+    transition: background-color 120ms ease, border-color 120ms ease,
+                color 120ms ease, text-decoration-color 120ms ease;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
