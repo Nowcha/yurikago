@@ -55,14 +55,32 @@ export function logout() {
  */
 export type WatchErrorHandler = (error: FirestoreError) => void;
 
+/**
+ * 同期の実態。オフラインキャッシュがあるとonSnapshotは通信断でもエラーを出さず
+ * 古い結果を配り続けるため、「サーバー由来か」「未送信の書き込みがあるか」を明示する
+ */
+export interface SyncState {
+  /** サーバーではなくローカルキャッシュから配信された = サーバーに到達できていない */
+  fromCache: boolean;
+  /** ローカルにのみ存在しサーバーが未受理の書き込みがある */
+  hasPendingWrites: boolean;
+}
+
 export function watchMyHousehold(
-  uid: string, cb: (h: Household | null) => void, onError: WatchErrorHandler,
+  uid: string,
+  cb: (h: Household | null, sync: SyncState) => void,
+  onError: WatchErrorHandler,
 ) {
   const q = query(collection(db, 'households'), where('memberUids', 'array-contains', uid));
-  return onSnapshot(q, (snap) => {
-    if (snap.empty) return cb(null);
+  // includeMetadataChanges: 接続状態の変化だけでも通知させる（データが変わらない待機中に必要）
+  return onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
+    const sync: SyncState = {
+      fromCache: snap.metadata.fromCache,
+      hasPendingWrites: snap.metadata.hasPendingWrites,
+    };
+    if (snap.empty) return cb(null, sync);
     const d = snap.docs[0];
-    cb({ id: d.id, ...(d.data() as Omit<Household, 'id'>) });
+    cb({ id: d.id, ...(d.data() as Omit<Household, 'id'>) }, sync);
   }, onError);
 }
 
