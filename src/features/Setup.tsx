@@ -39,7 +39,7 @@ export default function Setup({ user }: { user: User | null }) {
   const [dueDate, setDueDate] = useState('');
   const [name, setName] = useState('わが家');
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'idle' | 'done' | 'failed'>('idle');
   const [motherTakesLeave, setMotherTakesLeave] = useState(true);
   const [partnerTakesLeave, setPartnerTakesLeave] = useState(true);
   const [motherInsurance, setMotherInsurance] = useState<MotherInsurance>('employee');
@@ -165,18 +165,32 @@ export default function Setup({ user }: { user: User | null }) {
               世帯」であなたを追加すると、この画面が自動で切り替わります。
             </p>
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(user.uid);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
+              onClick={async () => {
+                try {
+                  // 失敗しても成功表示にすると、手入力での転記ミスに気づけない
+                  await navigator.clipboard.writeText(user.uid);
+                  setCopied('done');
+                } catch {
+                  setCopied('failed');
+                }
+                setTimeout(() => setCopied('idle'), 4000);
               }}
-              className="mt-3 w-full rounded-xl bg-base px-4 py-3 text-left font-mono text-xs text-ink/80"
+              className="mt-3 w-full rounded-xl bg-base px-4 py-3 text-left font-mono text-xs break-all text-ink/80"
             >
               {user.uid}
-              <span className="mt-1 block font-sans text-accent">
-                {copied ? 'コピーしました' : 'タップしてコピー'}
+              <span
+                className={`mt-1 block font-sans ${copied === 'failed' ? 'text-alert' : 'text-accent'}`}
+              >
+                {copied === 'done' && 'コピーしました'}
+                {copied === 'idle' && 'タップしてコピー'}
+                {copied === 'failed'
+                  && 'コピーできませんでした。この文字列を長押しして選択・コピーしてください'}
               </span>
             </button>
+            <p className="mt-2 text-xs leading-relaxed text-ink/50">
+              手で打ち直すと必ず失敗します（英数字28文字・大文字小文字を区別）。
+              かならずコピーして貼り付けてください。
+            </p>
           </section>
         </div>
       )}
