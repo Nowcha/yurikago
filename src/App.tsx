@@ -7,6 +7,7 @@ import {
 import {
   watchAuth, watchMyHousehold, watchTasks, watchItems, watchRecords, type SyncState,
 } from './lib/store';
+import SyncBanner from './components/SyncBanner';
 import Setup from './features/Setup';
 import Dashboard from './features/Dashboard';
 import Tasks from './features/Tasks';
@@ -78,6 +79,8 @@ export default function App() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-base">
       <main className="flex-1 pb-24">
+        {/* 全画面に出す。設定を開かないと同期異常に気づけない状態を作らない */}
+        <SyncBanner sync={sync} className="mx-5 mt-4" />
         {tab === 'home' && (
           <Dashboard household={household} tasks={tasks} items={items} onGoTasks={() => setTab('tasks')} />
         )}
@@ -87,7 +90,7 @@ export default function App() {
           <Records household={household} records={records} uid={user.uid} />
         )}
         {tab === 'settings' && (
-          <Settings user={user} household={household} tasks={tasks} items={items} sync={sync} />
+          <Settings user={user} household={household} tasks={tasks} items={items} />
         )}
       </main>
       <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-ink/10 bg-white/95 backdrop-blur">
