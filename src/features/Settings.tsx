@@ -2,8 +2,8 @@ import { useState } from 'react';
 import type { User } from 'firebase/auth';
 import type { Household, MotherInsurance, TaskInstance, PurchaseItem } from '../types';
 import {
-  addPartner, updateHouseholdSettings, logout, importBackup, deleteHouseholdData, loadAllRecords,
-  syncMasterData,
+  addPartner, removePartner, isValidUid, updateHouseholdSettings, logout, importBackup,
+  deleteHouseholdData, loadAllRecords, syncMasterData,
 } from '../lib/store';
 import { exportIcs, exportJson } from '../lib/exporters';
 import { normalizeHouseholdProfile } from '../lib/profile';
@@ -14,6 +14,39 @@ const INSURANCE_LABELS: Record<MotherInsurance, string> = {
   dependent: '家族の健康保険の扶養',
   other: 'その他・未確認',
 };
+
+const SERVER_ACK_TIMEOUT_MS = 10_000;
+
+/**
+ * Firestoreのオフラインキャッシュは書き込みを即ローカル反映するため、
+ * サーバーに届いていなくても画面上は成功に見える。相手に届いたかが本質のメンバー操作では
+ * ACKを待ち、返らなければ未送信として扱う（成功と誤認させない）
+ */
+async function withServerAck(write: Promise<void>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('server-ack-timeout')), SERVER_ACK_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([write, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function describeWriteError(error: unknown): string {
+  if (error instanceof Error && error.message === 'server-ack-timeout') {
+    return 'サーバーに反映できませんでした。画面上は変わって見えても、相手にはまだ届いていません。'
+      + '通信状況を確認してから、この画面を開き直して結果を確認してください。';
+  }
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code: unknown }).code)
+    : undefined;
+  if (code === 'permission-denied') {
+    return 'この世帯を編集する権限がありません（permission-denied）。';
+  }
+  return code ? `保存できませんでした（${code}）。` : '保存できませんでした。もう一度お試しください。';
+}
 
 export default function Settings({ user, household, tasks, items }: {
   user: User; household: Household; tasks: TaskInstance[]; items: PurchaseItem[];
@@ -38,6 +71,9 @@ export default function Settings({ user, household, tasks, items }: {
   const [savingHousehold, setSavingHousehold] = useState(false);
   const [householdError, setHouseholdError] = useState<string | null>(null);
   const [syncingMaster, setSyncingMaster] = useState(false);
+  const [memberBusy, setMemberBusy] = useState(false);
+  const [memberError, setMemberError] = useState<string | null>(null);
+  const [confirmRemoveUid, setConfirmRemoveUid] = useState<string | null>(null);
   const solo = household.memberUids.length < 2;
 
   return (
@@ -157,22 +193,59 @@ export default function Settings({ user, household, tasks, items }: {
             </div>
           </div>
         )}
-        <ul className="mt-2 text-sm text-ink/80">
+        <ul className="mt-3 space-y-2 text-sm text-ink/80">
           {household.memberUids.map((uid) => (
-            <li key={uid}>・{household.memberNames[uid] ?? uid}{uid === user.uid && '（自分）'}</li>
+            <li key={uid} className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p>
+                  {household.memberNames[uid] ?? '名前未設定'}
+                  {uid === user.uid && '（自分）'}
+                </p>
+                {/* 登録したIDが相手のものと一致しているかはここでしか照合できない */}
+                <p className="break-all font-mono text-[11px] leading-tight text-ink/40">{uid}</p>
+              </div>
+              {uid !== user.uid && (
+                <button
+                  disabled={memberBusy}
+                  onClick={async () => {
+                    if (confirmRemoveUid !== uid) return setConfirmRemoveUid(uid);
+                    setMemberBusy(true);
+                    setMemberError(null);
+                    try {
+                      await withServerAck(removePartner(household.id, uid));
+                      setConfirmRemoveUid(null);
+                    } catch (error: unknown) {
+                      setMemberError(describeWriteError(error));
+                    } finally {
+                      setMemberBusy(false);
+                    }
+                  }}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs disabled:opacity-40 ${
+                    confirmRemoveUid === uid
+                      ? 'border-alert bg-alert/10 font-bold text-alert'
+                      : 'border-ink/15 text-ink/50'
+                  }`}
+                >
+                  {confirmRemoveUid === uid ? '本当に解除' : '解除'}
+                </button>
+              )}
+            </li>
           ))}
         </ul>
-        {solo && (
+        {solo ? (
           <div className="mt-4 rounded-xl bg-base p-4">
             <p className="text-sm font-bold text-ink">パートナーを追加</p>
             <p className="mt-1 text-xs leading-relaxed text-ink/60">
               パートナーが同じURLでGoogleログインすると、初期画面に本人のIDが表示されます。
-              それをここに貼り付けてください。
+              「タップしてコピー」で写して、そのまま貼り付けてください（28文字・手入力は不可）。
             </p>
             <input
               value={partnerUid}
               onChange={(e) => setPartnerUid(e.target.value)}
               placeholder="パートナーのID"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className="mt-2 w-full rounded-xl border border-accent/20 bg-white px-3 py-2.5 font-mono text-xs"
             />
             <input
@@ -182,13 +255,42 @@ export default function Settings({ user, household, tasks, items }: {
               className="mt-2 w-full rounded-xl border border-accent/20 bg-white px-3 py-2.5 text-sm"
             />
             <button
-              disabled={!partnerUid.trim() || !partnerName.trim()}
-              onClick={() => addPartner(household.id, partnerUid.trim(), partnerName.trim())}
+              disabled={!partnerUid.trim() || !partnerName.trim() || memberBusy}
+              onClick={async () => {
+                // メッセージアプリ経由だと改行や空白が紛れるため除去してから検証する
+                const uid = partnerUid.replace(/\s/g, '');
+                if (!isValidUid(uid)) {
+                  return setMemberError(
+                    `IDの形式が違います（${uid.length}文字）。英数字28文字をコピーして貼り付けてください。`,
+                  );
+                }
+                setMemberBusy(true);
+                setMemberError(null);
+                try {
+                  await withServerAck(addPartner(household.id, uid, partnerName.trim()));
+                  setPartnerUid('');
+                  setPartnerName('');
+                } catch (error: unknown) {
+                  setMemberError(describeWriteError(error));
+                } finally {
+                  setMemberBusy(false);
+                }
+              }}
               className="mt-3 w-full rounded-full bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-40"
             >
-              追加する
+              {memberBusy ? '保存中…' : '追加する'}
             </button>
           </div>
+        ) : (
+          <p className="mt-3 text-xs leading-relaxed text-ink/50">
+            相手の画面が切り替わらないときは、上のIDが相手の画面に出ているIDと一致しているか
+            確認してください。違っていれば「解除」して登録し直せます。
+          </p>
+        )}
+        {memberError && (
+          <p className="mt-3 rounded-xl bg-alert/10 p-3 text-sm leading-relaxed text-alert">
+            {memberError}
+          </p>
         )}
       </section>
 

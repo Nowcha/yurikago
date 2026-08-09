@@ -5,7 +5,7 @@ import {
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, query, where, onSnapshot, writeBatch, updateDoc, setDoc,
-  arrayUnion, deleteDoc, deleteField, orderBy, limit, getDocs, documentId, startAfter,
+  arrayUnion, arrayRemove, deleteDoc, deleteField, orderBy, limit, getDocs, documentId, startAfter,
   type Unsubscribe, type FirestoreError,
 } from 'firebase/firestore';
 import type {
@@ -132,11 +132,29 @@ export async function createHousehold(
   return ref.id;
 }
 
+/** Firebase AuthのUIDは28文字の英数字。貼り付けミス・改行混入を弾く */
+const UID_PATTERN = /^[A-Za-z0-9]{28}$/;
+
+export function isValidUid(uid: string): boolean {
+  return UID_PATTERN.test(uid);
+}
+
 /** パートナー追加（UID登録方式、firestore.rules参照） */
 export function addPartner(householdId: string, partnerUid: string, partnerName: string) {
   return updateDoc(doc(db, 'households', householdId), {
     memberUids: arrayUnion(partnerUid),
     [`memberNames.${partnerUid}`]: partnerName,
+  });
+}
+
+/**
+ * 誤ったUIDを登録すると memberUids が2件になり追加フォームが消えて詰むため、
+ * 取り消し口を必ず用意する。自分自身は消せない（rulesのupdate条件を満たせなくなる）
+ */
+export function removePartner(householdId: string, partnerUid: string) {
+  return updateDoc(doc(db, 'households', householdId), {
+    memberUids: arrayRemove(partnerUid),
+    [`memberNames.${partnerUid}`]: deleteField(),
   });
 }
 
