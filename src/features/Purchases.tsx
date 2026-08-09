@@ -48,7 +48,7 @@ export default function Purchases({ household, items }: {
   const selected = selectedId ? items.find((i) => i.id === selectedId) ?? null : null;
 
   return (
-    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl xl:flex xl:max-w-6xl xl:gap-8">
+    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl xl:flex xl:max-w-[88rem] xl:gap-8">
       <div className="min-w-0 xl:flex-1">
       <h1 className="font-display text-xl font-bold text-ink">準備品</h1>
       <div className="mt-3 flex items-baseline gap-3 rounded-2xl bg-white p-4 border border-ink/10">
@@ -78,7 +78,7 @@ export default function Purchases({ household, items }: {
         return (
           <section key={c.id} className="mt-6">
             <h2 className="text-sm font-bold text-sub">{c.label}</h2>
-            <ul className="mt-2 space-y-2">
+            <ul className="mt-2 space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
               {list.map((i) => (
                 <ItemRow
                   key={i.id}

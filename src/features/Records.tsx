@@ -103,9 +103,12 @@ export default function Records({ household, records, uid }: {
   };
 
   return (
-    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl">
+    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl">
       <h1 className="font-display text-xl font-bold text-ink">きろく</h1>
 
+      {/* PCでは入力（左）と当日のログ（右）を並べ、記録するたびに縦へ流れないようにする */}
+      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
+      <div>
       {/* 経過時間の常時表示 */}
       <div className="mt-3 rounded-2xl border border-ink bg-white p-1.5">
         <div className="rounded-xl border border-ink/15 px-5 py-4 text-center">
@@ -122,7 +125,7 @@ export default function Records({ household, records, uid }: {
       </div>
 
       {/* ワンタップ記録グリッド */}
-      <div className="mt-5 grid grid-cols-3 gap-2.5">
+      <div className="mt-5 grid grid-cols-3 gap-2.5 md:grid-cols-4 lg:grid-cols-3">
         <QuickBtn icon={Heart} label="母乳 左" onTap={() => quickAdd('breast_l')} />
         <QuickBtn icon={Heart} label="母乳 右" onTap={() => quickAdd('breast_r')} />
         <QuickBtn icon={Milk} label="ミルク" onTap={() => quickAdd('formula')} />
@@ -171,6 +174,9 @@ export default function Records({ household, records, uid }: {
         </button>
       </div>
 
+      </div>
+
+      <div>
       <DayLog
         household={household}
         records={dayRecords}
@@ -179,6 +185,8 @@ export default function Records({ household, records, uid }: {
         loading={dayLoading}
         hasError={dayError}
       />
+      </div>
+      </div>
 
       {pending && (
         <ValueSheet
@@ -225,7 +233,7 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
   const heading = selectedDay === todayYmd() ? 'きょうの記録' : `${selectedDay} の記録`;
 
   return (
-    <section className="mt-7">
+    <section className="mt-7 lg:mt-0">
       <h2 className="text-sm font-bold text-sub">{heading}（{records.length}件）</h2>
       {!loading && !hasError && (
         <DaySummary records={contextRecords} selectedDay={selectedDay} />
