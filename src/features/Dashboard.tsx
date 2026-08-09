@@ -38,7 +38,10 @@ export default function Dashboard({
     .reduce((s, i) => s + (i.actualCost ?? i.budget ?? 0), 0);
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-6 px-5 pt-8 md:max-w-xl">
+    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl">
+      {/* PCでは縦に積まず2列に分ける。状況（左）と今すぐやること（右）で分担する */}
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+      <div className="space-y-6">
       {/* 週数スタンプカード（シグネチャ要素） */}
       <section className="rounded-2xl border border-ink bg-white p-1.5">
         <div className="rounded-xl border border-ink/15 px-6 py-7 text-center">
@@ -72,6 +75,27 @@ export default function Dashboard({
 
       {born && <SprintSection tasks={tasks} today={today} onGoTasks={onGoTasks} />}
 
+      <section className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl bg-white p-4 border border-ink/10">
+          <p className="text-xs text-sub">タスク進捗</p>
+          <p className="mt-1 font-display text-2xl font-bold text-accent">{progress}%</p>
+          <div className="mt-2 h-1.5 rounded-full bg-base">
+            <div className="h-full rounded-full bg-accent" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+        <div className="rounded-2xl bg-white p-4 border border-ink/10">
+          <p className="text-xs text-sub">準備品の予算</p>
+          <p className="mt-1 font-display text-2xl font-bold text-sub">
+            ¥{spent.toLocaleString()}
+          </p>
+          <p className="text-xs text-sub">/ ¥{budget.toLocaleString()}</p>
+        </div>
+      </section>
+
+      <CategoryProgressCard tasks={tasks} />
+      </div>
+
+      <div className="space-y-6">
       {overdue.length > 0 && (
         <section className="rounded-2xl bg-alert/10 p-4">
           <h2 className="font-display font-bold text-alert">期限を過ぎています</h2>
@@ -102,25 +126,8 @@ export default function Dashboard({
           <AssigneeSections tasks={imminent} household={household} />
         )}
       </section>
-
-      <section className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-white p-4 border border-ink/10">
-          <p className="text-xs text-sub">タスク進捗</p>
-          <p className="mt-1 font-display text-2xl font-bold text-accent">{progress}%</p>
-          <div className="mt-2 h-1.5 rounded-full bg-base">
-            <div className="h-full rounded-full bg-accent" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-        <div className="rounded-2xl bg-white p-4 border border-ink/10">
-          <p className="text-xs text-sub">準備品の予算</p>
-          <p className="mt-1 font-display text-2xl font-bold text-sub">
-            ¥{spent.toLocaleString()}
-          </p>
-          <p className="text-xs text-sub">/ ¥{budget.toLocaleString()}</p>
-        </div>
-      </section>
-
-      <CategoryProgressCard tasks={tasks} />
+      </div>
+      </div>
     </div>
   );
 }

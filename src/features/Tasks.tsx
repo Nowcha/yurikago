@@ -83,7 +83,7 @@ export default function Tasks({ household, tasks }: { household: Household; task
   };
 
   return (
-    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl xl:flex xl:max-w-6xl xl:gap-8">
+    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl xl:flex xl:max-w-[88rem] xl:gap-8">
       <div className="min-w-0 xl:flex-1">
       <header>
         <h1 className="font-display text-xl font-bold text-ink">やること</h1>
@@ -217,7 +217,7 @@ export default function Tasks({ household, tasks }: { household: Household; task
           <h2 className="text-sm font-bold text-sub">
             生まれたら期限が決まるもの（産前にできる準備あり）
           </h2>
-          <ul className="mt-3 space-y-3">
+          <ul className="mt-3 space-y-3 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
             {unscheduled.map((t) => (
               <li key={t.id}>
                 <TaskCard t={t} household={household} onOpen={() => setSelectedId(t.id)} />

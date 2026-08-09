@@ -65,8 +65,8 @@ export default function Settings({ user, household, tasks, items }: {
   const solo = household.memberUids.length < 2;
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-6 px-5 pt-8 md:max-w-xl">
-      <h1 className="font-display text-xl font-bold text-ink">設定</h1>
+    <div className="mx-auto w-full max-w-md space-y-6 px-5 pt-8 md:max-w-xl lg:max-w-5xl lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+      <h1 className="font-display text-xl font-bold text-ink lg:col-span-2">設定</h1>
 
       <section className="rounded-2xl bg-white p-5 border border-ink/10">
         <h2 className="font-display font-bold text-ink">世帯</h2>
@@ -434,7 +434,10 @@ export default function Settings({ user, household, tasks, items }: {
         </button>
       </section>
 
-      <button onClick={() => logout()} className="w-full py-3 text-sm text-sub hover:text-ink">
+      <button
+        onClick={() => logout()}
+        className="w-full py-3 text-sm text-sub hover:text-ink lg:col-span-2"
+      >
         ログアウト
       </button>
 
