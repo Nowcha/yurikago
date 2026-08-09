@@ -4,6 +4,9 @@ import type { MotherInsurance } from '../types';
 import { login, createHousehold, type SyncState } from '../lib/store';
 import SyncBanner from '../components/SyncBanner';
 import { withServerAck, describeWriteError } from '../lib/sync';
+import { dueDateBounds } from '../lib/dateBounds';
+
+const DUE_DATE_BOUNDS = dueDateBounds();
 
 function hasErrorCode(error: unknown): error is { code: string } {
   return typeof error === 'object' && error !== null && 'code' in error;
@@ -53,7 +56,7 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-8 bg-base px-6 py-10">
       <header className="text-center">
         <h1 className="font-display text-3xl font-bold text-accent">ゆりかご</h1>
-        <p className="mt-2 text-sm text-ink/60">
+        <p className="mt-2 text-sm text-sub">
           予定日から逆算する、ふたりの出産準備手帳
         </p>
       </header>
@@ -73,7 +76,7 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
                 setLoggingIn(false);
               }
             }}
-            className="w-full rounded-full bg-accent py-4 font-display text-lg font-bold text-white border border-ink active:scale-95 disabled:opacity-40"
+            className="w-full rounded-full bg-accent hover:bg-ink/85 py-4 font-display text-lg font-bold text-white border border-ink active:scale-95 disabled:opacity-40"
           >
             {loggingIn ? 'ログイン中…' : 'Googleでログイン'}
           </button>
@@ -93,6 +96,8 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
               <input
                 type="date"
                 value={dueDate}
+                min={DUE_DATE_BOUNDS.min}
+                max={DUE_DATE_BOUNDS.max}
                 onChange={(e) => setDueDate(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-accent/20 bg-base px-4 py-3 text-lg"
               />
@@ -122,7 +127,7 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
                 />
                 パートナーが育休を取得する予定
               </label>
-              <label className="block pt-1 text-xs font-bold text-ink/50">
+              <label className="block pt-1 text-xs font-bold text-sub">
                 出産する側の保険区分
                 <select
                   value={motherInsurance}
@@ -135,7 +140,7 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
                   <option value="other">その他・確認中</option>
                 </select>
               </label>
-              <p className="text-xs text-ink/50">
+              <p className="text-xs text-sub">
                 当てはまらない手続きは「対象外」として生成されます（あとから変更できます）
               </p>
             </div>
@@ -160,7 +165,7 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
                   setBusy(false);
                 }
               }}
-              className="mt-5 w-full rounded-full bg-accent py-3.5 font-display font-bold text-white disabled:opacity-40"
+              className="mt-5 w-full rounded-full bg-accent hover:bg-ink/85 py-3.5 font-display font-bold text-white disabled:opacity-40"
             >
               {busy ? '作成中…' : '世帯をつくってタスクを生成する'}
             </button>
@@ -169,7 +174,7 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
                 {createError}
               </p>
             )}
-            <p className="mt-2 text-xs text-ink/50">
+            <p className="mt-2 text-xs text-sub">
               江東区・東京都・国・会社の手続き40件と準備品リストが自動で並びます
             </p>
           </section>
@@ -203,7 +208,7 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
                   && 'コピーできませんでした。この文字列を長押しして選択・コピーしてください'}
               </span>
             </button>
-            <p className="mt-2 text-xs leading-relaxed text-ink/50">
+            <p className="mt-2 text-xs leading-relaxed text-sub">
               手で打ち直すと必ず失敗します（英数字28文字・大文字小文字を区別）。
               かならずコピーして貼り付けてください。
             </p>

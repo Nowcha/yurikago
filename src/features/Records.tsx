@@ -143,7 +143,7 @@ export default function Records({ household, records, uid }: {
       <div className="mt-7 flex items-center gap-2">
         <button
           onClick={() => setSelectedDay((day) => addDays(day, -1))}
-          className="rounded-full border border-ink/10 bg-white p-2.5 text-ink/60"
+          className="rounded-full border border-ink/10 hover:bg-surface bg-white p-2.5 text-sub"
           aria-label="前の日"
         >
           <ChevronLeft size={18} />
@@ -155,13 +155,13 @@ export default function Records({ household, records, uid }: {
           onChange={(event) => {
             if (event.target.value) setSelectedDay(event.target.value);
           }}
-          className="min-w-0 flex-1 rounded-full border border-ink/10 bg-white px-4 py-2.5 text-center text-sm text-ink"
+          className="min-w-0 flex-1 rounded-full border border-ink/10 hover:bg-surface bg-white px-4 py-2.5 text-center text-sm text-ink"
           aria-label="表示する日"
         />
         <button
           disabled={selectedDay >= todayYmd()}
           onClick={() => setSelectedDay((day) => addDays(day, 1))}
-          className="rounded-full border border-ink/10 bg-white p-2.5 text-ink/60 disabled:opacity-30"
+          className="rounded-full border border-ink/10 hover:bg-surface bg-white p-2.5 text-sub disabled:opacity-30"
           aria-label="次の日"
         >
           <ChevronRight size={18} />
@@ -250,7 +250,7 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setEditing(r)}
-                className="p-1.5 text-ink/40"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-sub hover:bg-surface hover:text-ink"
                 aria-label="編集"
               >
                 <Pencil size={16} />
@@ -265,7 +265,7 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
                     }
                   }
                 }}
-                className="p-1.5 text-ink/30"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-sub hover:bg-alert/10 hover:text-alert"
                 aria-label="削除"
               >
                 <X size={16} />
@@ -299,7 +299,7 @@ function DaySummary({ records, selectedDay }: { records: CareRecord[]; selectedD
     <dl className="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-ink/10 bg-ink/10 text-center">
       {rows.map(([label, value]) => (
         <div key={label} className="min-w-0 bg-white px-1 py-3">
-          <dt className="truncate text-[10px] text-ink/45">{label}</dt>
+          <dt className="truncate text-[10px] text-sub">{label}</dt>
           <dd className="mt-0.5 font-display text-sm font-bold text-ink">{value}</dd>
         </div>
       ))}
@@ -365,7 +365,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/15" />
         <p className="font-display font-bold text-ink">記録を編集</p>
-        <label className="mt-3 block text-xs font-bold text-ink/50">
+        <label className="mt-3 block text-xs font-bold text-sub">
           種類
           <select
             value={type}
@@ -381,7 +381,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
             ))}
           </select>
         </label>
-        <label className="mt-3 block text-xs font-bold text-ink/50">
+        <label className="mt-3 block text-xs font-bold text-sub">
           日時
           <input
             type="datetime-local"
@@ -391,7 +391,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
           />
         </label>
         {kind && (
-          <label className="mt-3 block text-xs font-bold text-ink/50">
+          <label className="mt-3 block text-xs font-bold text-sub">
             {kind === 'ml' ? '量（ml）' : kind === 'temp' ? '体温（℃）' : kind === 'weight' ? '体重（g）' : 'メモ'}
             <input
               type={kind === 'text' ? 'text' : 'number'}
@@ -404,7 +404,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
           </label>
         )}
         {(type === 'breast_l' || type === 'breast_r') && (
-          <label className="mt-3 block text-xs font-bold text-ink/50">
+          <label className="mt-3 block text-xs font-bold text-sub">
             授乳時間（分・任意）
             <input
               type="number"
@@ -420,7 +420,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
         <button
           disabled={saving || !at || Boolean(kind && !value.trim())}
           onClick={save}
-          className="mt-4 w-full rounded-full bg-accent py-3.5 font-display font-bold text-white disabled:opacity-40"
+          className="mt-4 w-full rounded-full bg-accent hover:bg-ink/85 py-3.5 font-display font-bold text-white disabled:opacity-40"
         >
           {saving ? '保存中…' : '変更を保存'}
         </button>
@@ -494,7 +494,7 @@ function ValueSheet({ type, onSave, onClose }: {
         <button
           onClick={save}
           disabled={!value.trim()}
-          className="mt-4 w-full rounded-full bg-accent py-3.5 font-display font-bold text-white disabled:opacity-40"
+          className="mt-4 w-full rounded-full bg-accent hover:bg-ink/85 py-3.5 font-display font-bold text-white disabled:opacity-40"
         >
           記録する
         </button>

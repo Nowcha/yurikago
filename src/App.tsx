@@ -100,7 +100,7 @@ export default function App() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`flex flex-col items-center gap-0.5 py-3 text-xs font-medium ${
-                tab === t.id ? 'text-accent' : 'text-ink/50'
+                tab === t.id ? 'text-accent' : 'text-sub hover:text-ink'
               }`}
               aria-current={tab === t.id ? 'page' : undefined}
             >
@@ -133,7 +133,7 @@ function SyncErrorScreen({ code }: { code: string }) {
       <p className="rounded-xl bg-alert/10 px-4 py-2 font-mono text-sm text-alert">{code}</p>
       <button
         onClick={() => window.location.reload()}
-        className="rounded-full border border-ink px-6 py-3 font-display font-bold text-ink active:scale-95"
+        className="rounded-full border border-ink hover:bg-surface px-6 py-3 font-display font-bold text-ink active:scale-95"
       >
         もう一度読み込む
       </button>

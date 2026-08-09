@@ -9,6 +9,9 @@ import {
 } from '../lib/store';
 import { AssigneeBadge } from './Dashboard';
 import { CATEGORY_LABEL, AUTHORITY_LABEL, assigneeLabel } from '../lib/labels';
+import { taskDateBounds } from '../lib/dateBounds';
+
+const TASK_DATE_BOUNDS = taskDateBounds();
 
 export default function Tasks({ household, tasks }: { household: Household; tasks: TaskInstance[] }) {
   const [categoryFilter, setCategoryFilter] = useState<TaskCategory | 'all'>('all');
@@ -111,14 +114,14 @@ export default function Tasks({ household, tasks }: { household: Household; task
       </ol>
 
       {scheduled.length === 0 && unscheduled.length === 0 && (
-        <p className="mt-6 rounded-2xl border border-ink/10 bg-white p-5 text-sm text-ink/50">
+        <p className="mt-6 rounded-2xl border border-ink/10 bg-white p-5 text-sm text-sub">
           条件に一致するタスクはありません。
         </p>
       )}
 
       {unscheduled.length > 0 && (
         <section className="mt-8">
-          <h2 className="text-sm font-bold text-ink/60">
+          <h2 className="text-sm font-bold text-sub">
             生まれたら期限が決まるもの（産前にできる準備あり）
           </h2>
           <ul className="mt-3 space-y-3">
@@ -152,7 +155,7 @@ function FilterSelect({ label, value, onChange, options }: {
   options: [string, string][];
 }) {
   return (
-    <label className="text-xs font-bold text-ink/50">
+    <label className="text-xs font-bold text-sub">
       {label}
       <select
         value={value}
@@ -174,7 +177,7 @@ function TaskCard({ t, household, onOpen }: {
   return (
     <button
       onClick={onOpen}
-      className={`w-full rounded-2xl bg-white p-4 text-left border border-ink/10 active:scale-[0.99] ${
+      className={`w-full rounded-2xl bg-white p-4 text-left border border-ink/10 hover:border-ink/35 active:scale-[0.99] ${
         done ? 'opacity-50' : ''
       }`}
     >
@@ -182,7 +185,7 @@ function TaskCard({ t, household, onOpen }: {
         <p className={`font-medium text-ink ${done ? 'line-through' : ''}`}>{t.title}</p>
         <AssigneeBadge assignee={t.assignee} names={household} />
       </div>
-      <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink/50">
+      <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-sub">
         {t.dueDateResolved && <span>{t.dueDateResolved}まで</span>}
         {t.deadline === 'hard' && (
           <span className="rounded bg-alert/10 px-1.5 py-0.5 text-alert">法定期限</span>
@@ -226,7 +229,7 @@ function TaskSheet({ task, household, onClose }: {
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/15" />
         <h2 className="font-display text-lg font-bold text-ink">{task.title}</h2>
         {task.dueDateResolved && (
-          <p className="mt-1 text-sm text-ink/60">
+          <p className="mt-1 text-sm text-sub">
             期限 {task.dueDateResolved}
             {task.deadline === 'hard' && <span className="ml-1 text-alert">（法定）</span>}
           </p>
@@ -235,7 +238,7 @@ function TaskSheet({ task, household, onClose }: {
         <div className="mt-4 space-y-3 rounded-xl bg-base p-4">
           {!task.templateId && (
             <>
-              <label className="block text-xs font-bold text-ink/50">
+              <label className="block text-xs font-bold text-sub">
                 タスク名
                 <input
                   value={title}
@@ -243,7 +246,7 @@ function TaskSheet({ task, household, onClose }: {
                   className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5 text-sm font-normal text-ink"
                 />
               </label>
-              <label className="block text-xs font-bold text-ink/50">
+              <label className="block text-xs font-bold text-sub">
                 カテゴリ
                 <select
                   value={category}
@@ -257,11 +260,13 @@ function TaskSheet({ task, household, onClose }: {
               </label>
             </>
           )}
-          <label className="block text-xs font-bold text-ink/50">
+          <label className="block text-xs font-bold text-sub">
             {task.templateId ? '期限の上書き' : '期限'}
             <input
               type="date"
               value={dueDate}
+              min={TASK_DATE_BOUNDS.min}
+              max={TASK_DATE_BOUNDS.max}
               onChange={(event) => setDueDate(event.target.value)}
               className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5 text-sm font-normal text-ink"
             />
@@ -299,7 +304,7 @@ function TaskSheet({ task, household, onClose }: {
                 setSavingDetails(false);
               }
             }}
-            className="w-full rounded-full border border-ink/15 bg-white py-2.5 text-sm font-bold text-ink disabled:opacity-40"
+            className="w-full rounded-full border border-ink/15 hover:bg-surface bg-white py-2.5 text-sm font-bold text-ink disabled:opacity-40"
           >
             {savingDetails ? '保存中…' : 'タスク内容を保存'}
           </button>
@@ -311,7 +316,7 @@ function TaskSheet({ task, household, onClose }: {
               key={s.value}
               onClick={() => patch({ status: s.value })}
               className={`flex-1 rounded-full py-2 text-sm font-medium ${
-                task.status === s.value ? 'bg-accent text-white' : 'bg-base text-ink/60'
+                task.status === s.value ? 'bg-accent hover:bg-ink/85 text-white' : 'bg-base text-sub hover:bg-surface hover:text-ink'
               }`}
             >
               {s.label}
@@ -319,14 +324,14 @@ function TaskSheet({ task, household, onClose }: {
           ))}
         </div>
 
-        <p className="mt-5 text-xs font-bold text-ink/50">担当</p>
+        <p className="mt-5 text-xs font-bold text-sub">担当</p>
         <div className="mt-1.5 flex gap-2">
           {ASSIGNEE_OPTIONS.map((a) => (
             <button
               key={a.value}
               onClick={() => patch({ assignee: a.value })}
               className={`flex-1 rounded-full py-2 text-sm ${
-                task.assignee === a.value ? 'bg-surface text-accent font-bold' : 'bg-base text-ink/60'
+                task.assignee === a.value ? 'bg-surface text-accent font-bold' : 'bg-base text-sub hover:bg-surface hover:text-ink'
               }`}
             >
               {a.label(household)}
@@ -335,7 +340,7 @@ function TaskSheet({ task, household, onClose }: {
           {task.assignee && (
             <button
               onClick={() => clearTaskAssignee(household.id, task.id)}
-              className="rounded-full bg-base px-3 py-2 text-sm text-ink/60"
+              className="rounded-full bg-base px-3 py-2 text-sm text-sub"
             >
               解除
             </button>
@@ -344,7 +349,7 @@ function TaskSheet({ task, household, onClose }: {
 
         {task.prepTasks && task.prepTasks.length > 0 && (
           <>
-            <p className="mt-5 text-xs font-bold text-ink/50">産前にできる準備</p>
+            <p className="mt-5 text-xs font-bold text-sub">産前にできる準備</p>
             <ul className="mt-1.5 space-y-2">
               {task.prepTasks.map((p, i) => (
                 <li key={i}>
@@ -399,7 +404,7 @@ function TaskSheet({ task, household, onClose }: {
           </button>
         )}
 
-        <label className="mt-5 block text-xs font-bold text-ink/50">
+        <label className="mt-5 block text-xs font-bold text-sub">
           メモ
           <textarea
             defaultValue={task.userMemo ?? ''}
@@ -441,11 +446,13 @@ function ManualTaskForm({ householdId, dueDate }: { householdId: string; dueDate
           placeholder="タスクを追加"
           className="flex-1 rounded-full border border-accent/20 bg-white px-4 py-3 text-sm"
         />
-        <button className="rounded-full bg-accent px-5 font-bold text-white">追加</button>
+        <button className="rounded-full bg-accent hover:bg-ink/85 px-5 font-bold text-white">追加</button>
       </div>
       <input
         type="date"
         value={due}
+        min={TASK_DATE_BOUNDS.min}
+        max={TASK_DATE_BOUNDS.max}
         onChange={(e) => setDue(e.target.value)}
         className="w-full rounded-full border border-accent/20 bg-white px-4 py-2.5 text-sm text-ink/70"
         aria-label="期限（任意）"

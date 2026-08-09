@@ -9,6 +9,9 @@ import { purchaseAlerts, purchaseDueDate } from '../lib/overview';
 import { assigneeLabel } from '../lib/labels';
 import { todayYmd } from '../lib/deadline';
 import { Pencil } from 'lucide-react';
+import { taskDateBounds } from '../lib/dateBounds';
+
+const TASK_DATE_BOUNDS = taskDateBounds();
 
 const CATEGORIES: { id: PurchaseCategory; label: string }[] = [
   { id: 'sleep', label: 'ねんね' },
@@ -41,7 +44,7 @@ export default function Purchases({ household, items }: {
       <h1 className="font-display text-xl font-bold text-ink">準備品</h1>
       <div className="mt-3 flex items-baseline gap-3 rounded-2xl bg-white p-4 border border-ink/10">
         <p className="font-display text-2xl font-bold text-sub">¥{spent.toLocaleString()}</p>
-        <p className="text-sm text-ink/50">/ 予算 ¥{budget.toLocaleString()}</p>
+        <p className="text-sm text-sub">/ 予算 ¥{budget.toLocaleString()}</p>
       </div>
 
       {alerts.length > 0 && (
@@ -51,7 +54,7 @@ export default function Purchases({ household, items }: {
             {alerts.map(({ item, due, urgency: u }) => (
               <li key={item.id} className="flex items-baseline justify-between gap-2">
                 <span className="truncate">・{item.name}</span>
-                <span className={`shrink-0 text-xs ${u === 'overdue' ? 'font-bold' : 'text-ink/50'}`}>
+                <span className={`shrink-0 text-xs ${u === 'overdue' ? 'font-bold' : 'text-sub'}`}>
                   {due}まで{u === 'overdue' && '（超過）'}
                 </span>
               </li>
@@ -65,7 +68,7 @@ export default function Purchases({ household, items }: {
         if (list.length === 0) return null;
         return (
           <section key={c.id} className="mt-6">
-            <h2 className="text-sm font-bold text-ink/60">{c.label}</h2>
+            <h2 className="text-sm font-bold text-sub">{c.label}</h2>
             <ul className="mt-2 space-y-2">
               {list.map((i) => (
                 <ItemRow
@@ -99,7 +102,7 @@ export default function Purchases({ household, items }: {
           placeholder="準備品を追加"
           className="flex-1 rounded-full border border-accent/20 bg-white px-4 py-3 text-sm"
         />
-        <button className="rounded-full bg-accent px-5 font-bold text-white">追加</button>
+        <button className="rounded-full bg-accent hover:bg-ink/85 px-5 font-bold text-white">追加</button>
       </form>
 
       {selected && (
@@ -140,7 +143,8 @@ function ItemRow({ item, household, onOpen }: {
       : clearItemAssignee(householdId, item.id);
   };
   return (
-    <li className={`rounded-2xl bg-white p-4 border border-ink/10 ${skipped ? 'opacity-40' : ''}`}>
+    // 「不要」は薄さだけでは伝わらない（読み込み中と区別できない）のでラベルで示す
+    <li className={`rounded-2xl bg-white p-4 border border-ink/10 ${skipped ? 'opacity-70' : ''}`}>
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
@@ -152,7 +156,10 @@ function ItemRow({ item, household, onOpen }: {
           <p className={`text-sm font-medium text-ink ${done ? 'line-through opacity-60' : ''}`}>
             {item.name}
           </p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink/50">
+          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-sub">
+            {skipped && (
+              <span className="rounded bg-surface px-1.5 py-0.5 font-bold text-ink">不要にした</span>
+            )}
             <span className="rounded bg-base px-1.5 py-0.5">{METHOD_LABEL[item.method]}</span>
             {item.budget != null && <span>予算¥{item.budget.toLocaleString()}</span>}
             {item.waitUntilBorn && (
@@ -166,14 +173,14 @@ function ItemRow({ item, household, onOpen }: {
                 className={`rounded-full px-2 py-0.5 ${
                   item.assignee
                     ? 'bg-surface font-medium text-accent'
-                    : 'border border-dashed border-ink/25 text-ink/40'
+                    : 'border border-dashed border-ink/25 text-sub'
                 }`}
               >
                 {item.assignee ? assigneeLabel(item.assignee, household) : '担当'}
               </button>
             )}
           </p>
-          {item.memo && <p className="mt-1 text-xs text-ink/50">{item.memo}</p>}
+          {item.memo && <p className="mt-1 text-xs text-sub">{item.memo}</p>}
           {item.userMemo && (
             <p className="mt-1 rounded-lg bg-base px-2 py-1.5 text-xs text-ink/70">
               {item.userMemo}
@@ -191,7 +198,7 @@ function ItemRow({ item, household, onOpen }: {
                   alert('状態を変更できませんでした');
                 }
               }}
-              className="px-1 py-2 text-xs text-ink/40"
+              className="flex min-h-11 items-center px-2.5 text-xs text-sub hover:text-ink"
             >
               不要
             </button>
@@ -200,15 +207,15 @@ function ItemRow({ item, household, onOpen }: {
             type="button"
             onClick={onOpen}
             aria-label={`${item.name}を編集`}
-            className="rounded-full border border-ink/10 p-2 text-ink/50"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-full border border-ink/10 text-sub hover:border-ink/35 hover:text-ink"
           >
             <Pencil size={15} strokeWidth={1.6} aria-hidden />
           </button>
         </div>
       </div>
-      {due && <p className="mt-2 pl-8 text-xs text-ink/40">必要日 {due}</p>}
+      {due && <p className="mt-2 pl-8 text-xs text-sub">必要日 {due}</p>}
       {done && (
-        <label className="mt-2 block pl-8 text-xs text-ink/50">
+        <label className="mt-2 block pl-8 text-xs text-sub">
           実費 ¥
           <input
             key={item.actualCost ?? 'empty'}
@@ -304,7 +311,7 @@ function PurchaseSheet({ item, household, onClose }: {
         <h2 className="font-display text-lg font-bold text-ink">準備品を編集</h2>
 
         <div className="mt-4 space-y-3">
-          <label className="block text-xs font-bold text-ink/50">
+          <label className="block text-xs font-bold text-sub">
             品名
             <input
               value={name}
@@ -313,7 +320,7 @@ function PurchaseSheet({ item, household, onClose }: {
             />
           </label>
           <div className="grid grid-cols-2 gap-2">
-            <label className="block text-xs font-bold text-ink/50">
+            <label className="block text-xs font-bold text-sub">
               カテゴリ
               <select
                 value={category}
@@ -325,7 +332,7 @@ function PurchaseSheet({ item, household, onClose }: {
                 ))}
               </select>
             </label>
-            <label className="block text-xs font-bold text-ink/50">
+            <label className="block text-xs font-bold text-sub">
               入手方法
               <select
                 value={method}
@@ -342,11 +349,13 @@ function PurchaseSheet({ item, household, onClose }: {
             <NumberField label="予算" value={budget} onChange={setBudget} />
             <NumberField label="実費" value={actualCost} onChange={setActualCost} />
           </div>
-          <label className="block text-xs font-bold text-ink/50">
+          <label className="block text-xs font-bold text-sub">
             必要日
             <input
               type="date"
               value={neededDate}
+              min={TASK_DATE_BOUNDS.min}
+              max={TASK_DATE_BOUNDS.max}
               onChange={(event) => setNeededDate(event.target.value)}
               className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-3 py-2.5 text-sm font-normal text-ink"
             />
@@ -361,11 +370,11 @@ function PurchaseSheet({ item, household, onClose }: {
             </button>
           )}
           {item.memo && (
-            <p className="rounded-xl bg-base p-3 text-xs leading-relaxed text-ink/60">
+            <p className="rounded-xl bg-base p-3 text-xs leading-relaxed text-sub">
               {item.memo}
             </p>
           )}
-          <label className="block text-xs font-bold text-ink/50">
+          <label className="block text-xs font-bold text-sub">
             家庭メモ
             <textarea
               value={userMemo}
@@ -376,7 +385,7 @@ function PurchaseSheet({ item, household, onClose }: {
           </label>
         </div>
 
-        <p className="mt-5 text-xs font-bold text-ink/50">状態</p>
+        <p className="mt-5 text-xs font-bold text-sub">状態</p>
         <div className="mt-1.5 grid grid-cols-3 gap-2">
           {([
             ['todo', '未準備'], ['done', '準備済み'], ['skipped', '不要'],
@@ -386,7 +395,7 @@ function PurchaseSheet({ item, household, onClose }: {
               type="button"
               onClick={() => setStatus(status)}
               className={`rounded-full py-2 text-sm font-medium ${
-                item.status === status ? 'bg-accent text-white' : 'bg-base text-ink/60'
+                item.status === status ? 'bg-accent hover:bg-ink/85 text-white' : 'bg-base text-sub hover:bg-surface hover:text-ink'
               }`}
             >
               {label}
@@ -399,7 +408,7 @@ function PurchaseSheet({ item, household, onClose }: {
           type="button"
           disabled={saving || !name.trim()}
           onClick={save}
-          className="mt-5 w-full rounded-full bg-accent py-3 font-bold text-white disabled:opacity-40"
+          className="mt-5 w-full rounded-full bg-accent hover:bg-ink/85 py-3 font-bold text-white disabled:opacity-40"
         >
           {saving ? '保存中…' : '変更を保存'}
         </button>
@@ -432,7 +441,7 @@ function NumberField({ label, value, onChange }: {
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="block text-xs font-bold text-ink/50">
+    <label className="block text-xs font-bold text-sub">
       {label}（円）
       <input
         type="number"
