@@ -5,6 +5,9 @@ import {
 } from 'lucide-react';
 import type { Household, CareRecord, CareRecordType } from '../types';
 import { addRecord, removeRecord, replaceRecord, watchRecordsForDay } from '../lib/store';
+import Sheet from '../components/Sheet';
+import { useToast } from '../components/Toast';
+import { describeWriteError } from '../lib/sync';
 import {
   parsePositiveMeasurement, summarizeCareDay, type CareDayWindow,
 } from '../lib/records';
@@ -217,6 +220,7 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
   loading: boolean;
   hasError: boolean;
 }) {
+  const { notify, notifyWithAction } = useToast();
   const [editing, setEditing] = useState<CareRecord | null>(null);
   const heading = selectedDay === todayYmd() ? 'きょうの記録' : `${selectedDay} の記録`;
 
@@ -257,12 +261,18 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
               </button>
               <button
                 onClick={async () => {
-                  if (confirm(`${hhmm(r.at)} の「${TYPE_META[r.type].label}」を削除しますか？`)) {
-                    try {
-                      await removeRecord(household.id, r.id);
-                    } catch {
-                      alert('記録を削除できませんでした');
-                    }
+                  // 寝ぼけて誤操作しやすい画面。確認より取り消しの方が実態に合う
+                  try {
+                    await removeRecord(household.id, r.id);
+                    notifyWithAction(`${hhmm(r.at)} の「${TYPE_META[r.type].label}」を削除しました`, {
+                      label: '取り消す',
+                      run: () => {
+                        void replaceRecord(household.id, r)
+                          .catch((error: unknown) => notify(describeWriteError(error)));
+                      },
+                    });
+                  } catch (error: unknown) {
+                    notify(describeWriteError(error));
                   }
                 }}
                 className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-sub hover:bg-alert/10 hover:text-alert"
@@ -312,6 +322,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
   householdId: string;
   onClose: () => void;
 }) {
+  const { notify } = useToast();
   const [type, setType] = useState<CareRecordType>(record.type);
   const [at, setAt] = useState(toDateTimeLocal(record.at));
   const [value, setValue] = useState(recordValue(record));
@@ -350,7 +361,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
     try {
       const pendingWrite = replaceRecord(householdId, next);
       onClose();
-      void pendingWrite.catch(() => alert('記録を同期できませんでした'));
+      void pendingWrite.catch((error: unknown) => notify(describeWriteError(error)));
     } catch {
       setError('記録を保存できませんでした。');
       setSaving(false);
@@ -358,13 +369,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
   };
 
   return (
-    <div className="fixed inset-0 z-10 flex items-end bg-ink/40" onClick={onClose}>
-      <div
-        className="w-full rounded-t-2xl bg-white p-6 pb-10"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/15" />
-        <p className="font-display font-bold text-ink">記録を編集</p>
+    <Sheet title="記録を編集" onClose={onClose}>
         <label className="mt-3 block text-xs font-bold text-sub">
           種類
           <select
@@ -424,8 +429,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
         >
           {saving ? '保存中…' : '変更を保存'}
         </button>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 
@@ -468,15 +472,7 @@ function ValueSheet({ type, onSave, onClose }: {
   };
 
   return (
-    <div className="fixed inset-0 z-10 flex items-end bg-ink/40" onClick={onClose}>
-      <div
-        className="w-full rounded-t-2xl bg-white p-6 pb-10"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/15" />
-        <p className="font-display font-bold text-ink">
-          {TYPE_META[type].label} — {config.label}
-        </p>
+    <Sheet title={`${TYPE_META[type].label} — ${config.label}`} onClose={onClose}>
         <input
           autoFocus
           type={config.input}
@@ -498,8 +494,7 @@ function ValueSheet({ type, onSave, onClose }: {
         >
           記録する
         </button>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 

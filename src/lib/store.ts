@@ -272,6 +272,11 @@ export function addTask(householdId: string, task: Omit<TaskInstance, 'id'>) {
 export function removeTask(householdId: string, taskId: string) {
   return deleteDoc(doc(db, 'households', householdId, 'tasks', taskId));
 }
+/** 削除の取り消し用。addTaskは新しいIDを採番してしまうので同じIDで書き戻す */
+export function restoreTask(householdId: string, task: TaskInstance) {
+  const { id, ...data } = task;
+  return setDoc(doc(db, 'households', householdId, 'tasks', id), data);
+}
 
 // ── Purchase items ───────────────────────────────────────────
 export function watchItems(
@@ -319,6 +324,11 @@ export function clearItemAssignee(householdId: string, itemId: string) {
 }
 export function removeItem(householdId: string, itemId: string): Promise<void> {
   return deleteDoc(doc(db, 'households', householdId, 'items', itemId));
+}
+/** 削除の取り消し用。restoreTaskと同じ理由で同じIDに書き戻す */
+export function restoreItem(householdId: string, item: PurchaseItem): Promise<void> {
+  const { id, ...data } = item;
+  return setDoc(doc(db, 'households', householdId, 'items', id), data);
 }
 
 export interface MasterSyncResult {

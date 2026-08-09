@@ -3,12 +3,14 @@ import type { User } from 'firebase/auth';
 import type { Household, MotherInsurance, TaskInstance, PurchaseItem } from '../types';
 import {
   addPartner, removePartner, isValidUid, updateHouseholdSettings, logout, importBackup,
-  deleteHouseholdData, loadAllRecords, syncMasterData,
+  deleteHouseholdData, loadAllRecords, syncMasterData, type BackupPayload,
 } from '../lib/store';
 import { withServerAck, describeWriteError } from '../lib/sync';
 import { exportIcs, exportJson } from '../lib/exporters';
 import { normalizeHouseholdProfile } from '../lib/profile';
 import { dueDateBounds, birthDateBounds } from '../lib/dateBounds';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast } from '../components/Toast';
 
 const DUE_DATE_BOUNDS = dueDateBounds();
 const BIRTH_DATE_BOUNDS = birthDateBounds();
@@ -23,6 +25,7 @@ const INSURANCE_LABELS: Record<MotherInsurance, string> = {
 export default function Settings({ user, household, tasks, items }: {
   user: User; household: Household; tasks: TaskInstance[]; items: PurchaseItem[];
 }) {
+  const { notify } = useToast();
   const normalizedProfile = normalizeHouseholdProfile(household.profile);
   const [partnerUid, setPartnerUid] = useState('');
   const [partnerName, setPartnerName] = useState('');
@@ -46,6 +49,19 @@ export default function Settings({ user, household, tasks, items }: {
   const [memberBusy, setMemberBusy] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [confirmRemoveUid, setConfirmRemoveUid] = useState<string | null>(null);
+  const [pendingRestore, setPendingRestore] = useState<BackupPayload | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [dangerBusy, setDangerBusy] = useState(false);
+
+  // 全削除ダイアログからも呼べるよう関数にしておく（勧めるだけで導線が無いのを避ける）
+  const downloadBackup = async (): Promise<void> => {
+    try {
+      const allRecords = await loadAllRecords(household.id);
+      exportJson(household, tasks, items, allRecords);
+    } catch (error: unknown) {
+      notify(describeWriteError(error));
+    }
+  };
   const solo = household.memberUids.length < 2;
 
   return (
@@ -323,8 +339,8 @@ export default function Settings({ user, household, tasks, items }: {
                     });
                     setBirthDate('');
                     setConfirmBirth(false);
-                  } catch {
-                    alert('出生日を保存できませんでした');
+                  } catch (error: unknown) {
+                    notify(describeWriteError(error));
                   } finally {
                     setSavingHousehold(false);
                   }
@@ -350,9 +366,9 @@ export default function Settings({ user, household, tasks, items }: {
             setSyncingMaster(true);
             try {
               const result = await syncMasterData(household, tasks, items);
-              alert(`初期データを更新しました（手続き ${result.addedTasks}件追加、準備品 ${result.addedItems}件追加）`);
-            } catch {
-              alert('初期データを更新できませんでした');
+              notify(`初期データを更新しました（手続き ${result.addedTasks}件・準備品 ${result.addedItems}件を追加）`);
+            } catch (error: unknown) {
+              notify(describeWriteError(error));
             } finally {
               setSyncingMaster(false);
             }
@@ -373,14 +389,7 @@ export default function Settings({ user, household, tasks, items }: {
             法定期限をカレンダーに登録（.ics）
           </button>
           <button
-            onClick={async () => {
-              try {
-                const allRecords = await loadAllRecords(household.id);
-                exportJson(household, tasks, items, allRecords);
-              } catch {
-                alert('バックアップデータを取得できませんでした');
-              }
-            }}
+            onClick={downloadBackup}
             className="w-full rounded-full bg-surface py-3 text-sm font-bold text-accent"
           >
             全データをバックアップ（.json）
@@ -395,17 +404,14 @@ export default function Settings({ user, household, tasks, items }: {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 try {
-                  const payload = JSON.parse(await file.text());
+                  const payload = JSON.parse(await file.text()) as BackupPayload;
                   if (!payload.household || !Array.isArray(payload.tasks)) {
-                    alert('バックアップファイルの形式が正しくありません');
+                    notify('バックアップファイルの形式が正しくありません');
                     return;
                   }
-                  if (confirm('現在のデータに上書き復元します。よろしいですか？')) {
-                    await importBackup(household.id, payload);
-                    alert('復元しました');
-                  }
+                  setPendingRestore(payload);
                 } catch {
-                  alert('ファイルを読み込めませんでした');
+                  notify('ファイルを読み込めませんでした');
                 } finally {
                   e.target.value = '';
                 }
@@ -421,24 +427,80 @@ export default function Settings({ user, household, tasks, items }: {
       <section className="rounded-2xl bg-white p-5 border border-ink/10">
         <h2 className="font-display font-bold text-alert">危険な操作</h2>
         <button
-          onClick={async () => {
-            if (!confirm('世帯のすべてのデータ（タスク・準備品・記録）を削除します。元に戻せません。よろしいですか？')) return;
-            if (!confirm('本当に削除しますか？事前にバックアップ（.json）を取ることをおすすめします。')) return;
-            try {
-              await deleteHouseholdData(household.id, tasks, items);
-            } catch {
-              alert('世帯データを削除できませんでした');
-            }
-          }}
-          className="mt-3 w-full rounded-full border border-alert/40 py-3 text-sm font-bold text-alert"
+          onClick={() => setConfirmDeleteAll(true)}
+          className="mt-3 w-full rounded-full border border-alert/40 py-3 text-sm font-bold text-alert hover:bg-alert/10"
         >
           世帯データをすべて削除
         </button>
       </section>
 
-      <button onClick={() => logout()} className="w-full py-3 text-sm text-sub">
+      <button onClick={() => logout()} className="w-full py-3 text-sm text-sub hover:text-ink">
         ログアウト
       </button>
+
+      {pendingRestore && (
+        <ConfirmDialog
+          title="バックアップから復元"
+          body={
+            <>
+              現在のタスク・準備品・記録を、このファイルの内容で上書きします。
+              いま画面に出ている内容は失われます。
+            </>
+          }
+          confirmLabel="復元する"
+          destructive
+          busy={dangerBusy}
+          onCancel={() => setPendingRestore(null)}
+          onConfirm={async () => {
+            setDangerBusy(true);
+            try {
+              await importBackup(household.id, pendingRestore);
+              setPendingRestore(null);
+              notify('復元しました');
+            } catch (error: unknown) {
+              notify(describeWriteError(error));
+            } finally {
+              setDangerBusy(false);
+            }
+          }}
+        />
+      )}
+
+      {confirmDeleteAll && (
+        <ConfirmDialog
+          title="世帯データをすべて削除"
+          body={
+            <>
+              <p>
+                タスク・準備品・記録をすべて削除します。
+                <strong className="font-bold text-alert">元に戻せません。</strong>
+              </p>
+              <button
+                type="button"
+                onClick={downloadBackup}
+                className="mt-3 w-full rounded-full border border-ink/15 py-2.5 text-sm font-bold text-ink hover:bg-surface"
+              >
+                先にバックアップを取る（.json）
+              </button>
+            </>
+          }
+          confirmLabel="削除する"
+          destructive
+          busy={dangerBusy}
+          onCancel={() => setConfirmDeleteAll(false)}
+          onConfirm={async () => {
+            setDangerBusy(true);
+            try {
+              await deleteHouseholdData(household.id, tasks, items);
+              setConfirmDeleteAll(false);
+            } catch (error: unknown) {
+              notify(describeWriteError(error));
+            } finally {
+              setDangerBusy(false);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

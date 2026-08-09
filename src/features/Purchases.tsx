@@ -3,13 +3,16 @@ import type {
   Household, PurchaseItem, PurchaseCategory, PurchaseMethod, Assignee,
 } from '../types';
 import {
-  updateItem, addItem, clearItemAssignee, updateItemDetails, removeItem,
+  updateItem, addItem, clearItemAssignee, updateItemDetails, removeItem, restoreItem,
 } from '../lib/store';
 import { purchaseAlerts, purchaseDueDate } from '../lib/overview';
 import { assigneeLabel } from '../lib/labels';
 import { todayYmd } from '../lib/deadline';
 import { Pencil } from 'lucide-react';
 import { taskDateBounds } from '../lib/dateBounds';
+import Sheet from '../components/Sheet';
+import { useToast } from '../components/Toast';
+import { describeWriteError } from '../lib/sync';
 
 const TASK_DATE_BOUNDS = taskDateBounds();
 
@@ -26,6 +29,7 @@ const METHOD_LABEL: Record<PurchaseMethod, string> = {
   buy: '購入', rental: 'レンタル', handmedown: 'お下がり', gift: 'もらう', undecided: '未定',
 };
 const METHODS = Object.entries(METHOD_LABEL) as [PurchaseMethod, string][];
+const ASSIGNEE_OPTIONS: Assignee[] = ['partner1', 'partner2', 'both'];
 
 export default function Purchases({ household, items }: {
   household: Household; items: PurchaseItem[];
@@ -117,31 +121,16 @@ export default function Purchases({ household, items }: {
   );
 }
 
-/** 担当のタップ順: 未設定 → partner1 → partner2 → ふたり → 未設定 */
-function nextAssignee(current?: Assignee): Assignee | undefined {
-  switch (current) {
-    case undefined: return 'partner1';
-    case 'partner1': return 'partner2';
-    case 'partner2': return 'both';
-    case 'both': return undefined;
-  }
-}
-
 function ItemRow({ item, household, onOpen }: {
   item: PurchaseItem;
   household: Household;
   onOpen: () => void;
 }) {
+  const { notify } = useToast();
   const householdId = household.id;
   const done = item.status === 'done';
   const skipped = item.status === 'skipped';
   const due = purchaseDueDate(item, household.dueDate, household.birthDate);
-  const cycleAssignee = () => {
-    const next = nextAssignee(item.assignee);
-    return next
-      ? updateItem(householdId, item.id, { assignee: next })
-      : clearItemAssignee(householdId, item.id);
-  };
   return (
     // 「不要」は薄さだけでは伝わらない（読み込み中と区別できない）のでラベルで示す
     <li className={`rounded-2xl bg-white p-4 border border-ink/10 ${skipped ? 'opacity-70' : ''}`}>
@@ -149,7 +138,11 @@ function ItemRow({ item, household, onOpen }: {
         <input
           type="checkbox"
           checked={done}
-          onChange={(e) => updateItem(householdId, item.id, { status: e.target.checked ? 'done' : 'todo' })}
+          onChange={(e) => {
+            void updateItem(householdId, item.id, { status: e.target.checked ? 'done' : 'todo' })
+              .catch((error: unknown) => notify(describeWriteError(error)));
+          }}
+          aria-label={`${item.name}を準備済みにする`}
           className="mt-1 h-5 w-5"
         />
         <div className="min-w-0 flex-1">
@@ -165,19 +158,10 @@ function ItemRow({ item, household, onOpen }: {
             {item.waitUntilBorn && (
               <span className="rounded bg-sub/15 px-1.5 py-0.5 text-sub">産後に様子見て</span>
             )}
-            {!skipped && (
-              <button
-                type="button"
-                onClick={cycleAssignee}
-                aria-label="担当を切り替え"
-                className={`rounded-full px-2 py-0.5 ${
-                  item.assignee
-                    ? 'bg-surface font-medium text-accent'
-                    : 'border border-dashed border-ink/25 text-sub'
-                }`}
-              >
-                {item.assignee ? assigneeLabel(item.assignee, household) : '担当'}
-              </button>
+            {item.assignee && (
+              <span className="rounded-full bg-surface px-2 py-0.5 font-medium text-accent">
+                {assigneeLabel(item.assignee, household)}
+              </span>
             )}
           </p>
           {item.memo && <p className="mt-1 text-xs text-sub">{item.memo}</p>}
@@ -191,12 +175,9 @@ function ItemRow({ item, household, onOpen }: {
           {!skipped && (
             <button
               type="button"
-              onClick={async () => {
-                try {
-                  await updateItem(householdId, item.id, { status: 'skipped' });
-                } catch {
-                  alert('状態を変更できませんでした');
-                }
+              onClick={() => {
+                void updateItem(householdId, item.id, { status: 'skipped' })
+                  .catch((error: unknown) => notify(describeWriteError(error)));
               }}
               className="flex min-h-11 items-center px-2.5 text-xs text-sub hover:text-ink"
             >
@@ -238,6 +219,7 @@ function PurchaseSheet({ item, household, onClose }: {
   household: Household;
   onClose: () => void;
 }) {
+  const { notify, notifyWithAction } = useToast();
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState<PurchaseCategory>(item.category);
   const [method, setMethod] = useState<PurchaseMethod>(item.method);
@@ -284,7 +266,7 @@ function PurchaseSheet({ item, household, onClose }: {
         userMemo,
       });
       onClose();
-      void pendingWrite.catch(() => alert('準備品の変更を同期できませんでした'));
+      void pendingWrite.catch((error: unknown) => notify(describeWriteError(error)));
     } catch {
       setError('準備品の変更を保存できませんでした。');
       setSaving(false);
@@ -293,22 +275,12 @@ function PurchaseSheet({ item, household, onClose }: {
 
   const setStatus = (status: PurchaseItem['status']): void => {
     setError(null);
-    try {
-      const pendingWrite = updateItem(household.id, item.id, { status });
-      void pendingWrite.catch(() => setError('状態を同期できませんでした。'));
-    } catch {
-      setError('状態を変更できませんでした。');
-    }
+    void updateItem(household.id, item.id, { status })
+      .catch((error: unknown) => setError(describeWriteError(error)));
   };
 
   return (
-    <div className="fixed inset-0 z-10 flex items-end bg-ink/40" onClick={onClose}>
-      <div
-        className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 pb-10"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/15" />
-        <h2 className="font-display text-lg font-bold text-ink">準備品を編集</h2>
+    <Sheet title="準備品を編集" onClose={onClose}>
 
         <div className="mt-4 space-y-3">
           <label className="block text-xs font-bold text-sub">
@@ -403,6 +375,39 @@ function PurchaseSheet({ item, household, onClose }: {
           ))}
         </div>
 
+        <p className="mt-5 text-xs font-bold text-sub">担当</p>
+        <div className="mt-1.5 flex gap-2">
+          {ASSIGNEE_OPTIONS.map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                void updateItem(household.id, item.id, { assignee: value })
+                  .catch((cause: unknown) => setError(describeWriteError(cause)));
+              }}
+              className={`flex-1 rounded-full py-2 text-sm ${
+                item.assignee === value
+                  ? 'bg-surface font-bold text-accent'
+                  : 'bg-base text-sub hover:bg-surface hover:text-ink'
+              }`}
+            >
+              {assigneeLabel(value, household)}
+            </button>
+          ))}
+          {item.assignee && (
+            <button
+              type="button"
+              onClick={() => {
+                void clearItemAssignee(household.id, item.id)
+                  .catch((cause: unknown) => setError(describeWriteError(cause)));
+              }}
+              className="rounded-full bg-base px-3 py-2 text-sm text-sub hover:bg-surface hover:text-ink"
+            >
+              解除
+            </button>
+          )}
+        </div>
+
         {error && <p className="mt-3 text-xs text-alert">{error}</p>}
         <button
           type="button"
@@ -414,24 +419,28 @@ function PurchaseSheet({ item, household, onClose }: {
         </button>
         <button
           type="button"
-          onClick={() => {
-            if (!confirm('この準備品を削除しますか？')) return;
-            setSaving(true);
+          onClick={async () => {
+            // 確認より取り消しの方が速い。先に消してから取り消し口を出す
+            const snapshot = item;
+            onClose();
             try {
-              const pendingWrite = removeItem(household.id, item.id);
-              onClose();
-              void pendingWrite.catch(() => alert('準備品を削除できませんでした'));
-            } catch {
-              setError('準備品を削除できませんでした。');
-              setSaving(false);
+              await removeItem(household.id, item.id);
+              notifyWithAction(`「${snapshot.name}」を削除しました`, {
+                label: '取り消す',
+                run: () => {
+                  void restoreItem(household.id, snapshot)
+                    .catch((error: unknown) => notify(describeWriteError(error)));
+                },
+              });
+            } catch (error: unknown) {
+              notify(describeWriteError(error));
             }
           }}
-          className="mt-3 w-full rounded-full bg-alert/10 py-2.5 text-sm font-bold text-alert"
+          className="mt-3 w-full rounded-full bg-alert/10 py-2.5 text-sm font-bold text-alert hover:bg-alert/20"
         >
           準備品を削除
         </button>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 
