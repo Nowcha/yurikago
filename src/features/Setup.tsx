@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import type { MotherInsurance } from '../types';
-import { login, createHousehold, type SyncState } from '../lib/store';
+import { login, createHousehold, consumeRedirectResult, type SyncState } from '../lib/store';
 import SyncBanner from '../components/SyncBanner';
 import { withServerAck, describeWriteError } from '../lib/sync';
 import { dueDateBounds } from '../lib/dateBounds';
@@ -50,6 +50,15 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
   const [motherInsurance, setMotherInsurance] = useState<MotherInsurance>('employee');
   const [authError, setAuthError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // リダイレクト経由の失敗はここで拾わないと、無言でログイン画面に戻るだけになる
+  useEffect(() => {
+    let alive = true;
+    consumeRedirectResult().catch((error: unknown) => {
+      if (alive) setAuthError(describeAuthError(error));
+    });
+    return () => { alive = false; };
+  }, []);
   const [loggingIn, setLoggingIn] = useState(false);
 
   return (
@@ -72,7 +81,6 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
                 await login();
               } catch (error: unknown) {
                 setAuthError(describeAuthError(error));
-              } finally {
                 setLoggingIn(false);
               }
             }}
