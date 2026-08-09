@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import type { MotherInsurance } from '../types';
 import { login, createHousehold, type SyncState } from '../lib/store';
 import SyncBanner from '../components/SyncBanner';
+import { withServerAck, describeWriteError } from '../lib/sync';
 
 function hasErrorCode(error: unknown): error is { code: string } {
   return typeof error === 'object' && error !== null && 'code' in error;
@@ -45,6 +46,7 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
   const [partnerTakesLeave, setPartnerTakesLeave] = useState(true);
   const [motherInsurance, setMotherInsurance] = useState<MotherInsurance>('employee');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [loggingIn, setLoggingIn] = useState(false);
 
   return (
@@ -141,12 +143,19 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
               disabled={!dueDate || busy}
               onClick={async () => {
                 setBusy(true);
+                setCreateError(null);
                 try {
-                  await createHousehold(user.uid, user.displayName ?? '名前未設定', name, dueDate, {
-                    motherTakesLeave,
-                    partnerTakesLeave,
-                    motherInsurance,
-                  });
+                  // ローカル反映で即ホームへ遷移するため、拒否されると無言で巻き戻る。
+                  // まだこの画面にいる間に失敗したら理由を出す（遷移後はSyncBannerが受け持つ）
+                  await withServerAck(
+                    createHousehold(user.uid, user.displayName ?? '名前未設定', name, dueDate, {
+                      motherTakesLeave,
+                      partnerTakesLeave,
+                      motherInsurance,
+                    }),
+                  );
+                } catch (error: unknown) {
+                  setCreateError(describeWriteError(error));
                 } finally {
                   setBusy(false);
                 }
@@ -155,6 +164,11 @@ export default function Setup({ user, sync }: { user: User | null; sync: SyncSta
             >
               {busy ? '作成中…' : '世帯をつくってタスクを生成する'}
             </button>
+            {createError && (
+              <p className="mt-3 rounded-xl bg-alert/10 p-3 text-sm leading-relaxed text-alert">
+                {createError}
+              </p>
+            )}
             <p className="mt-2 text-xs text-ink/50">
               江東区・東京都・国・会社の手続き40件と準備品リストが自動で並びます
             </p>

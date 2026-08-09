@@ -3,9 +3,9 @@ import type { User } from 'firebase/auth';
 import type { Household, MotherInsurance, TaskInstance, PurchaseItem } from '../types';
 import {
   addPartner, removePartner, isValidUid, updateHouseholdSettings, logout, importBackup,
-  deleteHouseholdData, loadAllRecords, syncMasterData, type SyncState,
+  deleteHouseholdData, loadAllRecords, syncMasterData,
 } from '../lib/store';
-import SyncBanner from '../components/SyncBanner';
+import { withServerAck, describeWriteError } from '../lib/sync';
 import { exportIcs, exportJson } from '../lib/exporters';
 import { normalizeHouseholdProfile } from '../lib/profile';
 
@@ -16,41 +16,8 @@ const INSURANCE_LABELS: Record<MotherInsurance, string> = {
   other: 'その他・未確認',
 };
 
-const SERVER_ACK_TIMEOUT_MS = 10_000;
-
-/**
- * Firestoreのオフラインキャッシュは書き込みを即ローカル反映するため、
- * サーバーに届いていなくても画面上は成功に見える。相手に届いたかが本質のメンバー操作では
- * ACKを待ち、返らなければ未送信として扱う（成功と誤認させない）
- */
-async function withServerAck(write: Promise<void>): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('server-ack-timeout')), SERVER_ACK_TIMEOUT_MS);
-  });
-  try {
-    await Promise.race([write, timeout]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function describeWriteError(error: unknown): string {
-  if (error instanceof Error && error.message === 'server-ack-timeout') {
-    return 'サーバーに反映できませんでした。画面上は変わって見えても、相手にはまだ届いていません。'
-      + '通信状況を確認してから、この画面を開き直して結果を確認してください。';
-  }
-  const code = typeof error === 'object' && error !== null && 'code' in error
-    ? String((error as { code: unknown }).code)
-    : undefined;
-  if (code === 'permission-denied') {
-    return 'この世帯を編集する権限がありません（permission-denied）。';
-  }
-  return code ? `保存できませんでした（${code}）。` : '保存できませんでした。もう一度お試しください。';
-}
-
-export default function Settings({ user, household, tasks, items, sync }: {
-  user: User; household: Household; tasks: TaskInstance[]; items: PurchaseItem[]; sync: SyncState;
+export default function Settings({ user, household, tasks, items }: {
+  user: User; household: Household; tasks: TaskInstance[]; items: PurchaseItem[];
 }) {
   const normalizedProfile = normalizeHouseholdProfile(household.profile);
   const [partnerUid, setPartnerUid] = useState('');
@@ -80,8 +47,6 @@ export default function Settings({ user, household, tasks, items, sync }: {
   return (
     <div className="space-y-6 px-5 pt-8">
       <h1 className="font-display text-xl font-bold text-ink">設定</h1>
-
-      <SyncBanner sync={sync} />
 
       <section className="rounded-2xl bg-white p-5 border border-ink/10">
         <h2 className="font-display font-bold text-ink">世帯</h2>
