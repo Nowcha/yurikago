@@ -83,8 +83,8 @@ export default function Tasks({ household, tasks }: { household: Household; task
   };
 
   return (
-    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl xl:flex xl:max-w-[88rem] xl:gap-8">
-      <div className="min-w-0 xl:max-w-3xl xl:flex-1">
+    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl xl:flex xl:max-w-[88rem] xl:justify-center xl:gap-8">
+      <div className="min-w-0 xl:max-w-2xl xl:flex-1">
       <header>
         <h1 className="font-display text-xl font-bold text-ink">やること</h1>
         <div className="relative mt-4">
@@ -232,7 +232,7 @@ export default function Tasks({ household, tasks }: { household: Household; task
 
       {/* 広い画面では一覧を隠さず併置する。一覧に戻らずに次のタスクへ移れる */}
       {wide && (
-        <aside className="sticky top-8 hidden h-fit max-h-[calc(100dvh-4rem)] min-w-[22rem] flex-1 overflow-y-auto rounded-2xl border border-ink/10 bg-white p-6 xl:block">
+        <aside className="sticky top-8 hidden h-fit max-h-[calc(100dvh-4rem)] w-[26rem] shrink-0 overflow-y-auto rounded-2xl border border-ink/10 bg-white p-6 xl:block">
           {selected ? (
             <>
               <div className="flex items-start justify-between gap-3">
