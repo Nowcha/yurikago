@@ -65,7 +65,7 @@ export default function Settings({ user, household, tasks, items }: {
   const solo = household.memberUids.length < 2;
 
   return (
-    <div className="space-y-6 px-5 pt-8">
+    <div className="mx-auto w-full max-w-md space-y-6 px-5 pt-8 md:max-w-xl">
       <h1 className="font-display text-xl font-bold text-ink">設定</h1>
 
       <section className="rounded-2xl bg-white p-5 border border-ink/10">
