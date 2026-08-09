@@ -8,11 +8,12 @@ import {
 import { purchaseAlerts, purchaseDueDate } from '../lib/overview';
 import { assigneeLabel } from '../lib/labels';
 import { todayYmd } from '../lib/deadline';
-import { Pencil } from 'lucide-react';
+import { Pencil, X } from 'lucide-react';
 import { taskDateBounds } from '../lib/dateBounds';
 import Sheet from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { describeWriteError } from '../lib/sync';
+import { useMediaQuery, WIDE_SCREEN } from '../hooks/useMediaQuery';
 
 const TASK_DATE_BOUNDS = taskDateBounds();
 
@@ -35,7 +36,8 @@ export default function Purchases({ household, items }: {
   household: Household; items: PurchaseItem[];
 }) {
   const [newName, setNewName] = useState('');
-  const [selected, setSelected] = useState<PurchaseItem | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const wide = useMediaQuery(WIDE_SCREEN);
   const today = todayYmd();
   const active = items.filter((i) => i.status !== 'skipped');
   const budget = active.reduce((s, i) => s + (i.budget ?? 0), 0);
@@ -43,8 +45,11 @@ export default function Purchases({ household, items }: {
     .reduce((s, i) => s + (i.actualCost ?? i.budget ?? 0), 0);
   const alerts = purchaseAlerts(items, household.dueDate, household.birthDate, today);
 
+  const selected = selectedId ? items.find((i) => i.id === selectedId) ?? null : null;
+
   return (
-    <div className="px-5 pt-8">
+    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl xl:flex xl:max-w-6xl xl:gap-8">
+      <div className="min-w-0 xl:flex-1">
       <h1 className="font-display text-xl font-bold text-ink">準備品</h1>
       <div className="mt-3 flex items-baseline gap-3 rounded-2xl bg-white p-4 border border-ink/10">
         <p className="font-display text-2xl font-bold text-sub">¥{spent.toLocaleString()}</p>
@@ -79,7 +84,7 @@ export default function Purchases({ household, items }: {
                   key={i.id}
                   item={i}
                   household={household}
-                  onOpen={() => setSelected(i)}
+                  onOpen={() => setSelectedId(i.id)}
                 />
               ))}
             </ul>
@@ -109,12 +114,43 @@ export default function Purchases({ household, items }: {
         <button className="rounded-full bg-accent hover:bg-ink/85 px-5 font-bold text-white">追加</button>
       </form>
 
-      {selected && (
+      </div>
+
+      {/* 広い画面では一覧を隠さず併置する */}
+      {wide && (
+        <aside className="sticky top-8 hidden h-fit max-h-[calc(100dvh-4rem)] w-[26rem] shrink-0 overflow-y-auto rounded-2xl border border-ink/10 bg-white p-6 xl:block">
+          {selected ? (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="font-display text-lg font-bold text-ink">準備品を編集</h2>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(null)}
+                  aria-label="詳細を閉じる"
+                  className="-mr-2 -mt-1 flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-sub hover:bg-surface hover:text-ink"
+                >
+                  <X size={20} strokeWidth={1.6} aria-hidden />
+                </button>
+              </div>
+              <PurchaseDetail
+                key={selected.id}
+                item={selected}
+                household={household}
+                onClose={() => setSelectedId(null)}
+              />
+            </>
+          ) : (
+            <p className="text-sm text-sub">準備品を選ぶと、ここに詳細が出ます。</p>
+          )}
+        </aside>
+      )}
+
+      {!wide && selected && (
         <PurchaseSheet
           key={selected.id}
-          item={items.find((item) => item.id === selected.id) ?? selected}
+          item={selected}
           household={household}
-          onClose={() => setSelected(null)}
+          onClose={() => setSelectedId(null)}
         />
       )}
     </div>
@@ -219,6 +255,19 @@ function PurchaseSheet({ item, household, onClose }: {
   household: Household;
   onClose: () => void;
 }) {
+  return (
+    <Sheet title="準備品を編集" onClose={onClose}>
+      <PurchaseDetail item={item} household={household} onClose={onClose} />
+    </Sheet>
+  );
+}
+
+/** シートと右ペインで共有する中身。枠は呼び出し側が用意する */
+function PurchaseDetail({ item, household, onClose }: {
+  item: PurchaseItem;
+  household: Household;
+  onClose: () => void;
+}) {
   const { notify, notifyWithAction } = useToast();
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState<PurchaseCategory>(item.category);
@@ -280,8 +329,7 @@ function PurchaseSheet({ item, household, onClose }: {
   };
 
   return (
-    <Sheet title="準備品を編集" onClose={onClose}>
-
+    <>
         <div className="mt-4 space-y-3">
           <label className="block text-xs font-bold text-sub">
             品名
@@ -440,7 +488,7 @@ function PurchaseSheet({ item, household, onClose }: {
         >
           準備品を削除
         </button>
-    </Sheet>
+    </>
   );
 }
 

@@ -38,7 +38,7 @@ export default function Dashboard({
     .reduce((s, i) => s + (i.actualCost ?? i.budget ?? 0), 0);
 
   return (
-    <div className="space-y-6 px-5 pt-8">
+    <div className="mx-auto w-full max-w-md space-y-6 px-5 pt-8 md:max-w-xl">
       {/* 週数スタンプカード（シグネチャ要素） */}
       <section className="rounded-2xl border border-ink bg-white p-1.5">
         <div className="rounded-xl border border-ink/15 px-6 py-7 text-center">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useUrlState } from './hooks/useUrlState';
 import type { User } from 'firebase/auth';
 import type { Household, TaskInstance, PurchaseItem, CareRecord } from './types';
 import {
@@ -38,7 +39,7 @@ export default function App() {
   const [tasks, setTasks] = useState<TaskInstance[]>([]);
   const [items, setItems] = useState<PurchaseItem[]>([]);
   const [records, setRecords] = useState<CareRecord[]>([]);
-  const [tab, setTab] = useState<Tab>('home');
+  const [tab, setTab] = useUrlState<Tab>('tab', 'home');
   const [syncError, setSyncError] = useState<string | null>(null);
   const [sync, setSync] = useState<SyncState>({ fromCache: true, hasPendingWrites: false });
 
@@ -77,23 +78,50 @@ export default function App() {
   const tabs = household.birthDate ? POSTPARTUM_TABS : BASE_TABS;
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-base">
-      <main className="flex-1 pb-24">
-        {/* 全画面に出す。設定を開かないと同期異常に気づけない状態を作らない */}
-        <SyncBanner sync={sync} className="mx-5 mt-4" />
-        {tab === 'home' && (
-          <Dashboard household={household} tasks={tasks} items={items} onGoTasks={() => setTab('tasks')} />
-        )}
-        {tab === 'tasks' && <Tasks household={household} tasks={tasks} />}
-        {tab === 'items' && <Purchases household={household} items={items} />}
-        {tab === 'records' && household.birthDate && (
-          <Records household={household} records={records} uid={user.uid} />
-        )}
-        {tab === 'settings' && (
-          <Settings user={user} household={household} tasks={tasks} items={items} />
-        )}
-      </main>
-      <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-ink/10 bg-white/95 backdrop-blur">
+    <div className="flex min-h-dvh bg-base">
+      {/* PCでは画面下端まで視線を動かさずに済む左サイドナビにする */}
+      <nav
+        aria-label="メインナビゲーション"
+        className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col gap-1 border-r border-ink/10 bg-white p-4 md:flex"
+      >
+        <p className="px-3 pb-4 font-display text-lg font-bold text-ink">ゆりかご</p>
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            aria-current={tab === t.id ? 'page' : undefined}
+            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${
+              tab === t.id ? 'bg-surface text-accent' : 'text-sub hover:bg-base hover:text-ink'
+            }`}
+          >
+            <t.icon size={18} strokeWidth={tab === t.id ? 2.2 : 1.6} aria-hidden />
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <main className="flex-1 pb-24 md:pb-8">
+          {/* 全画面に出す。設定を開かないと同期異常に気づけない状態を作らない */}
+          <SyncBanner sync={sync} className="mx-auto mt-4 max-w-md md:mx-5" />
+          {tab === 'home' && (
+            <Dashboard household={household} tasks={tasks} items={items} onGoTasks={() => setTab('tasks')} />
+          )}
+          {tab === 'tasks' && <Tasks household={household} tasks={tasks} />}
+          {tab === 'items' && <Purchases household={household} items={items} />}
+          {tab === 'records' && household.birthDate && (
+            <Records household={household} records={records} uid={user.uid} />
+          )}
+          {tab === 'settings' && (
+            <Settings user={user} household={household} tasks={tasks} items={items} />
+          )}
+        </main>
+      </div>
+
+      <nav
+        aria-label="メインナビゲーション"
+        className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-ink/10 bg-white/95 backdrop-blur md:hidden"
+      >
         <div className={`grid ${tabs.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
           {tabs.map((t) => (
             <button

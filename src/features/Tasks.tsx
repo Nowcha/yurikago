@@ -13,18 +13,33 @@ import { taskDateBounds } from '../lib/dateBounds';
 import Sheet from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { describeWriteError } from '../lib/sync';
+import { useUrlState } from '../hooks/useUrlState';
+import { useMediaQuery, WIDE_SCREEN } from '../hooks/useMediaQuery';
+import { Search, X } from 'lucide-react';
 
 const TASK_DATE_BOUNDS = taskDateBounds();
 
+type DeadlineFilter = 'all' | 'overdue' | 'week' | 'unscheduled';
+
+const STATUS_FILTER_LABEL: Record<string, string> = {
+  active: '未完了', todo: '未着手', doing: '進行中', done: '完了', na: '対象外', all: 'すべて',
+};
+const DEADLINE_FILTER_LABEL: Record<DeadlineFilter, string> = {
+  all: 'すべて', overdue: '期限超過', week: '7日以内', unscheduled: '日付未確定',
+};
+
 export default function Tasks({ household, tasks }: { household: Household; tasks: TaskInstance[] }) {
-  const [categoryFilter, setCategoryFilter] = useState<TaskCategory | 'all'>('all');
-  const [assigneeFilter, setAssigneeFilter] = useState<Assignee | 'none' | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'active' | 'all'>('active');
-  const [deadlineFilter, setDeadlineFilter] = useState<'all' | 'overdue' | 'week' | 'unscheduled'>('all');
-  const [selected, setSelected] = useState<TaskInstance | null>(null);
+  const [categoryFilter, setCategoryFilter] = useUrlState<TaskCategory | 'all'>('cat', 'all');
+  const [assigneeFilter, setAssigneeFilter] = useUrlState<Assignee | 'none' | 'all'>('who', 'all');
+  const [statusFilter, setStatusFilter] = useUrlState<TaskStatus | 'active' | 'all'>('st', 'active');
+  const [deadlineFilter, setDeadlineFilter] = useUrlState<DeadlineFilter>('due', 'all');
+  const [search, setSearch] = useUrlState<string>('q', '');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const wide = useMediaQuery(WIDE_SCREEN);
   const today = todayYmd();
 
-  const { scheduled, unscheduled } = useMemo(() => {
+  const { scheduled, unscheduled, visibleCount } = useMemo(() => {
+    const needle = search.trim().toLowerCase();
     const visible = tasks.filter((task) => {
       if (categoryFilter !== 'all' && task.category !== categoryFilter) return false;
       if (assigneeFilter === 'none' && task.assignee) return false;
@@ -36,6 +51,9 @@ export default function Tasks({ household, tasks }: { household: Household; task
       if (deadlineFilter === 'overdue' && taskUrgency !== 'overdue') return false;
       if (deadlineFilter === 'week' && taskUrgency !== 'imminent') return false;
       if (deadlineFilter === 'unscheduled' && taskUrgency !== 'unscheduled') return false;
+      // 制度名で直接探せるように、本文と補足も対象に含める
+      if (needle && !`${task.title} ${task.notes ?? ''} ${CATEGORY_LABEL[task.category]}`
+        .toLowerCase().includes(needle)) return false;
       return true;
     });
     return {
@@ -43,14 +61,49 @@ export default function Tasks({ household, tasks }: { household: Household; task
         .filter((t) => t.dueDateResolved)
         .sort((a, b) => (a.dueDateResolved! < b.dueDateResolved! ? -1 : 1)),
       unscheduled: visible.filter((t) => !t.dueDateResolved),
+      visibleCount: visible.length,
     };
-  }, [assigneeFilter, categoryFilter, deadlineFilter, statusFilter, tasks, today]);
+  }, [assigneeFilter, categoryFilter, deadlineFilter, search, statusFilter, tasks, today]);
+
+  const selected = selectedId ? tasks.find((t) => t.id === selectedId) ?? null : null;
+  const activeFilters = [
+    categoryFilter !== 'all' && ['カテゴリ', CATEGORY_LABEL[categoryFilter as TaskCategory], () => setCategoryFilter('all')],
+    assigneeFilter !== 'all' && ['担当', assigneeFilter === 'none' ? '担当未定' : assigneeLabel(assigneeFilter, household), () => setAssigneeFilter('all')],
+    statusFilter !== 'active' && ['状態', STATUS_FILTER_LABEL[statusFilter], () => setStatusFilter('active')],
+    deadlineFilter !== 'all' && ['期限', DEADLINE_FILTER_LABEL[deadlineFilter], () => setDeadlineFilter('all')],
+    search.trim() !== '' && ['検索', search.trim(), () => setSearch('')],
+  ].filter(Boolean) as [string, string, () => void][];
+
+  const resetFilters = () => {
+    setCategoryFilter('all');
+    setAssigneeFilter('all');
+    setStatusFilter('active');
+    setDeadlineFilter('all');
+    setSearch('');
+  };
 
   return (
-    <div className="px-5 pt-8">
+    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl xl:flex xl:max-w-6xl xl:gap-8">
+      <div className="min-w-0 xl:flex-1">
       <header>
         <h1 className="font-display text-xl font-bold text-ink">やること</h1>
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="relative mt-4">
+          <Search
+            size={16}
+            strokeWidth={1.6}
+            aria-hidden
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sub"
+          />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="制度名・キーワードで探す"
+            aria-label="タスクを検索"
+            className="w-full rounded-full border border-ink/15 bg-white py-2.5 pl-11 pr-4 text-sm text-ink"
+          />
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
           <FilterSelect
             label="カテゴリ"
             value={categoryFilter}
@@ -84,12 +137,40 @@ export default function Tasks({ household, tasks }: { household: Household; task
           <FilterSelect
             label="期限"
             value={deadlineFilter}
-            onChange={(value) => setDeadlineFilter(value as typeof deadlineFilter)}
+            onChange={(value) => setDeadlineFilter(value as DeadlineFilter)}
             options={[
               ['all', 'すべての期限'], ['overdue', '期限超過'],
               ['week', '7日以内'], ['unscheduled', '日付未確定'],
             ]}
           />
+        </div>
+        {/* 何件に絞られているかと、その場で解除する手段を必ず出す */}
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+          <span className="font-medium text-sub">
+            {visibleCount}件 / 全{tasks.length}件
+          </span>
+          {activeFilters.map(([label, value, clear]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={clear}
+              className="flex items-center gap-1 rounded-full border border-ink/20 bg-white py-1 pl-2.5 pr-2 text-ink hover:border-ink/40"
+            >
+              <span className="text-sub">{label}:</span>
+              {value}
+              <X size={12} strokeWidth={2} aria-hidden />
+              <span className="sr-only">この絞り込みを解除</span>
+            </button>
+          ))}
+          {activeFilters.length > 1 && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-accent underline underline-offset-4 decoration-ink/25 hover:decoration-ink"
+            >
+              すべて解除
+            </button>
+          )}
         </div>
       </header>
 
@@ -104,7 +185,7 @@ export default function Tasks({ household, tasks }: { household: Household; task
                   u === 'overdue' ? 'bg-alert' : u === 'imminent' ? 'bg-sub' : 'bg-accent/50'
                 }`}
               />
-              <TaskCard t={t} household={household} onOpen={() => setSelected(t)} />
+              <TaskCard t={t} household={household} onOpen={() => setSelectedId(t.id)} />
             </li>
           );
         })}
@@ -117,9 +198,18 @@ export default function Tasks({ household, tasks }: { household: Household; task
       </ol>
 
       {scheduled.length === 0 && unscheduled.length === 0 && (
-        <p className="mt-6 rounded-2xl border border-ink/10 bg-white p-5 text-sm text-sub">
-          条件に一致するタスクはありません。
-        </p>
+        <div className="mt-6 rounded-2xl border border-ink/10 bg-white p-5 text-sm text-sub">
+          <p>条件に一致するタスクはありません。</p>
+          {activeFilters.length > 0 && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="mt-2 text-accent underline underline-offset-4 decoration-ink/25 hover:decoration-ink"
+            >
+              絞り込みを解除して全件を見る
+            </button>
+          )}
+        </div>
       )}
 
       {unscheduled.length > 0 && (
@@ -130,7 +220,7 @@ export default function Tasks({ household, tasks }: { household: Household; task
           <ul className="mt-3 space-y-3">
             {unscheduled.map((t) => (
               <li key={t.id}>
-                <TaskCard t={t} household={household} onOpen={() => setSelected(t)} />
+                <TaskCard t={t} household={household} onOpen={() => setSelectedId(t.id)} />
               </li>
             ))}
           </ul>
@@ -138,13 +228,43 @@ export default function Tasks({ household, tasks }: { household: Household; task
       )}
 
       <ManualTaskForm householdId={household.id} dueDate={household.dueDate} />
+      </div>
 
-      {selected && (
+      {/* 広い画面では一覧を隠さず併置する。一覧に戻らずに次のタスクへ移れる */}
+      {wide && (
+        <aside className="sticky top-8 hidden h-fit max-h-[calc(100dvh-4rem)] w-[26rem] shrink-0 overflow-y-auto rounded-2xl border border-ink/10 bg-white p-6 xl:block">
+          {selected ? (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="font-display text-lg font-bold text-ink">{selected.title}</h2>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(null)}
+                  aria-label="詳細を閉じる"
+                  className="-mr-2 -mt-1 flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-sub hover:bg-surface hover:text-ink"
+                >
+                  <X size={20} strokeWidth={1.6} aria-hidden />
+                </button>
+              </div>
+              <TaskDetail
+                key={selected.id}
+                task={selected}
+                household={household}
+                onClose={() => setSelectedId(null)}
+              />
+            </>
+          ) : (
+            <p className="text-sm text-sub">タスクを選ぶと、ここに詳細が出ます。</p>
+          )}
+        </aside>
+      )}
+
+      {!wide && selected && (
         <TaskSheet
           key={selected.id}
-          task={tasks.find((t) => t.id === selected.id) ?? selected}
+          task={selected}
           household={household}
-          onClose={() => setSelected(null)}
+          onClose={() => setSelectedId(null)}
         />
       )}
     </div>
@@ -217,6 +337,17 @@ const ASSIGNEE_OPTIONS: { value: Assignee; label: (h: Household) => string }[] =
 function TaskSheet({ task, household, onClose }: {
   task: TaskInstance; household: Household; onClose: () => void;
 }) {
+  return (
+    <Sheet title={task.title} onClose={onClose}>
+      <TaskDetail task={task} household={household} onClose={onClose} />
+    </Sheet>
+  );
+}
+
+/** シートと右ペインで共有する中身。枠は呼び出し側が用意する */
+function TaskDetail({ task, household, onClose }: {
+  task: TaskInstance; household: Household; onClose: () => void;
+}) {
   const { notify, notifyWithAction } = useToast();
   // 状態や担当の変更が失敗しても無言だった。結果は必ず返す
   const patch = (p: Partial<TaskInstance>) => {
@@ -229,7 +360,7 @@ function TaskSheet({ task, household, onClose }: {
   const [savingDetails, setSavingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   return (
-    <Sheet title={task.title} onClose={onClose}>
+    <>
       {task.dueDateResolved && (
         <p className="mt-1 text-sm text-sub">
           期限 {task.dueDateResolved}
@@ -429,7 +560,7 @@ function TaskSheet({ task, household, onClose }: {
             className="mt-1.5 w-full rounded-xl border border-accent/20 bg-base p-3 text-sm"
           />
         </label>
-    </Sheet>
+    </>
   );
 }
 

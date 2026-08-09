@@ -103,7 +103,7 @@ export default function Records({ household, records, uid }: {
   };
 
   return (
-    <div className="px-5 pt-8">
+    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl">
       <h1 className="font-display text-xl font-bold text-ink">きろく</h1>
 
       {/* 経過時間の常時表示 */}
