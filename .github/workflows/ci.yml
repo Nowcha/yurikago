@@ -1,0 +1,34 @@
+name: CI
+
+# PR時点で検証する。従来はmainへのpush後にしか走らず、
+# 壊れたコードがmainに入ってからでないと分からなかった
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      # Firestoreエミュレータ（test:rules）にJavaが要る
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Unit tests
+        run: npm test
+      - name: Firestore rules tests
+        run: npm run test:rules
+      - name: Build
+        run: npm run build
