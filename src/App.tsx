@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useUrlState } from './hooks/useUrlState';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 import type { User } from 'firebase/auth';
 import type { Household, TaskInstance, PurchaseItem, CareRecord } from './types';
 import {
@@ -41,7 +42,28 @@ export default function App() {
   const [records, setRecords] = useState<CareRecord[]>([]);
   const [tab, setTab] = useUrlState<Tab>('tab', 'home');
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [sync, setSync] = useState<SyncState>({ fromCache: true, hasPendingWrites: false });
+  // 購読ごとの同期状態。未送信はコレクション横断で見ないと取りこぼす
+  const [syncParts, setSyncParts] = useState<Record<string, SyncState>>({});
+  const online = useOnlineStatus();
+
+  const reportSync = useCallback((key: string, next: SyncState) => {
+    setSyncParts((prev) => {
+      const current = prev[key];
+      if (current
+        && current.fromCache === next.fromCache
+        && current.hasPendingWrites === next.hasPendingWrites) return prev;
+      return { ...prev, [key]: next };
+    });
+  }, []);
+
+  const sync = useMemo<SyncState>(() => {
+    const parts = Object.values(syncParts);
+    return {
+      // OSが切断を報告した時点で確定。Firestoreの検知を待たない
+      fromCache: !online || parts.some((part) => part.fromCache),
+      hasPendingWrites: parts.some((part) => part.hasPendingWrites),
+    };
+  }, [online, syncParts]);
 
   useEffect(() => watchAuth(setUser), []);
 
@@ -50,21 +72,27 @@ export default function App() {
     setSyncError(null);
     return watchMyHousehold(
       user.uid,
-      (h, s) => { setHousehold(h); setSync(s); },
+      (h, s) => { setHousehold(h); reportSync('household', s); },
       (e) => setSyncError(e.code),
     );
-  }, [user]);
+  }, [user, reportSync]);
 
   useEffect(() => {
     if (!household) { setTasks([]); setItems([]); return; }
     const onError = (e: { code: string }) => setSyncError(e.code);
-    const u1 = watchTasks(household.id, setTasks, onError);
-    const u2 = watchItems(household.id, setItems, onError);
+    const u1 = watchTasks(household.id, (next, s) => {
+      setTasks(next); reportSync('tasks', s);
+    }, onError);
+    const u2 = watchItems(household.id, (next, s) => {
+      setItems(next); reportSync('items', s);
+    }, onError);
     const u3 = household.birthDate
-      ? watchRecords(household.id, setRecords, onError)
+      ? watchRecords(household.id, (next, s) => {
+        setRecords(next); reportSync('records', s);
+      }, onError)
       : undefined;
     return () => { u1(); u2(); u3?.(); };
-  }, [household?.id, household?.birthDate]);
+  }, [household?.id, household?.birthDate, reportSync]);
 
   // 購読が失敗すると以降コールバックは来ない。スプラッシュのまま放置せず理由を出す
   if (syncError) return <SyncErrorScreen code={syncError} />;
@@ -113,7 +141,7 @@ export default function App() {
             <Records household={household} records={records} uid={user.uid} />
           )}
           {tab === 'settings' && (
-            <Settings user={user} household={household} tasks={tasks} items={items} />
+            <Settings user={user} household={household} tasks={tasks} items={items} sync={sync} />
           )}
         </main>
       </div>

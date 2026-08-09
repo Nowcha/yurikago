@@ -1,4 +1,8 @@
+import { useEffect, useState } from 'react';
 import type { SyncState } from '../lib/store';
+
+/** 購読の張り直しで一瞬キャッシュ配信になることがあるため、その間は出さない */
+const SETTLE_MS = 1500;
 
 /**
  * Firestoreのオフラインキャッシュは通信断でもエラーを出さず古い結果を配り続ける。
@@ -7,7 +11,19 @@ import type { SyncState } from '../lib/store';
 export default function SyncBanner({ sync, className = '' }: {
   sync: SyncState; className?: string;
 }) {
-  if (!sync.fromCache && !sync.hasPendingWrites) return null;
+  const unsynced = sync.fromCache || sync.hasPendingWrites;
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!unsynced) {
+      setVisible(false);
+      return;
+    }
+    const timer = setTimeout(() => setVisible(true), SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [unsynced]);
+
+  if (!visible) return null;
 
   return (
     <div

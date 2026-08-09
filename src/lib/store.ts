@@ -104,6 +104,10 @@ export interface SyncState {
   hasPendingWrites: boolean;
 }
 
+function toSync(snap: { metadata: { fromCache: boolean; hasPendingWrites: boolean } }): SyncState {
+  return { fromCache: snap.metadata.fromCache, hasPendingWrites: snap.metadata.hasPendingWrites };
+}
+
 export function watchMyHousehold(
   uid: string,
   cb: (h: Household | null, sync: SyncState) => void,
@@ -112,10 +116,7 @@ export function watchMyHousehold(
   const q = query(collection(db, 'households'), where('memberUids', 'array-contains', uid));
   // includeMetadataChanges: 接続状態の変化だけでも通知させる（データが変わらない待機中に必要）
   return onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
-    const sync: SyncState = {
-      fromCache: snap.metadata.fromCache,
-      hasPendingWrites: snap.metadata.hasPendingWrites,
-    };
+    const sync = toSync(snap);
     if (snap.empty) return cb(null, sync);
     const d = snap.docs[0];
     cb({ id: d.id, ...(d.data() as Omit<Household, 'id'>) }, sync);
@@ -273,11 +274,18 @@ export async function registerBirth(household: Household, tasks: TaskInstance[],
 
 // ── Tasks ────────────────────────────────────────────────────
 export function watchTasks(
-  householdId: string, cb: (tasks: TaskInstance[]) => void, onError: WatchErrorHandler,
+  householdId: string,
+  cb: (tasks: TaskInstance[], sync: SyncState) => void,
+  onError: WatchErrorHandler,
 ) {
-  return onSnapshot(collection(db, 'households', householdId, 'tasks'), (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<TaskInstance, 'id'>) })));
-  }, onError);
+  return onSnapshot(
+    collection(db, 'households', householdId, 'tasks'),
+    { includeMetadataChanges: true },
+    (snap) => {
+      cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<TaskInstance, 'id'>) })), toSync(snap));
+    },
+    onError,
+  );
 }
 export function updateTask(householdId: string, taskId: string, patch: Partial<TaskInstance>) {
   return updateDoc(doc(db, 'households', householdId, 'tasks', taskId), patch);
@@ -318,11 +326,18 @@ export function restoreTask(householdId: string, task: TaskInstance) {
 
 // ── Purchase items ───────────────────────────────────────────
 export function watchItems(
-  householdId: string, cb: (items: PurchaseItem[]) => void, onError: WatchErrorHandler,
+  householdId: string,
+  cb: (items: PurchaseItem[], sync: SyncState) => void,
+  onError: WatchErrorHandler,
 ) {
-  return onSnapshot(collection(db, 'households', householdId, 'items'), (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<PurchaseItem, 'id'>) })));
-  }, onError);
+  return onSnapshot(
+    collection(db, 'households', householdId, 'items'),
+    { includeMetadataChanges: true },
+    (snap) => {
+      cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<PurchaseItem, 'id'>) })), toSync(snap));
+    },
+    onError,
+  );
 }
 export function updateItem(householdId: string, itemId: string, patch: Partial<PurchaseItem>) {
   return updateDoc(doc(db, 'households', householdId, 'items', itemId), patch);
@@ -512,7 +527,7 @@ export async function importBackup(householdId: string, payload: BackupPayload) 
 export async function deleteHouseholdData(
   householdId: string, tasks: TaskInstance[], items: PurchaseItem[],
 ): Promise<void> {
-  const records = await loadAllRecords(householdId);
+  const { records } = await loadAllRecords(householdId);
   const ops: ((b: ReturnType<typeof writeBatch>) => void)[] = [];
   for (const t of tasks) ops.push((b) => b.delete(doc(db, 'households', householdId, 'tasks', t.id)));
   for (const i of items) ops.push((b) => b.delete(doc(db, 'households', householdId, 'items', i.id)));
@@ -525,8 +540,15 @@ export async function deleteHouseholdData(
 const RECORDS_PAGE_SIZE = 300;
 
 /** バックアップ・全削除用に記録をページ分割して全件取得 */
-export async function loadAllRecords(householdId: string): Promise<CareRecord[]> {
+export interface AllRecordsResult {
+  records: CareRecord[];
+  /** サーバーではなくキャッシュから読んだ = 一部が欠けている可能性がある */
+  fromCache: boolean;
+}
+
+export async function loadAllRecords(householdId: string): Promise<AllRecordsResult> {
   const recordsRef = collection(db, 'households', householdId, 'records');
+  let fromCache = false;
   const records = await collectAllPages<CareRecord>(async (cursor) => {
     const pageQuery = cursor === null
       ? query(recordsRef, orderBy(documentId()), limit(RECORDS_PAGE_SIZE))
@@ -537,6 +559,7 @@ export async function loadAllRecords(householdId: string): Promise<CareRecord[]>
           limit(RECORDS_PAGE_SIZE),
         );
     const snapshot = await getDocs(pageQuery);
+    if (snapshot.metadata.fromCache) fromCache = true;
     const lastDocument = snapshot.docs.at(-1);
 
     return {
@@ -550,19 +573,21 @@ export async function loadAllRecords(householdId: string): Promise<CareRecord[]>
     };
   });
 
-  return records.sort((left, right) => right.at - left.at);
+  return { records: records.sort((left, right) => right.at - left.at), fromCache };
 }
 
 /** 画面表示用に直近の記録を購読（新しい順・約1か月分を想定） */
 export function watchRecords(
-  householdId: string, cb: (records: CareRecord[]) => void, onError: WatchErrorHandler,
+  householdId: string,
+  cb: (records: CareRecord[], sync: SyncState) => void,
+  onError: WatchErrorHandler,
 ) {
   const q = query(
     collection(db, 'households', householdId, 'records'),
     orderBy('at', 'desc'), limit(1000),
   );
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CareRecord, 'id'>) })));
+  return onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
+    cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CareRecord, 'id'>) })), toSync(snap));
   }, onError);
 }
 /** 選択日と前日の記録を件数制限なしで購読する。前日分は日またぎ睡眠の集計に使う。 */

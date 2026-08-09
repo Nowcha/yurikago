@@ -3,7 +3,8 @@ import type { User } from 'firebase/auth';
 import type { Household, MotherInsurance, TaskInstance, PurchaseItem } from '../types';
 import {
   addPartner, removePartner, isValidUid, updateHouseholdSettings, logout, importBackup,
-  deleteHouseholdData, loadAllRecords, syncMasterData, type BackupPayload,
+  deleteHouseholdData, loadAllRecords, syncMasterData,
+  type BackupPayload, type SyncState,
 } from '../lib/store';
 import { withServerAck, describeWriteError } from '../lib/sync';
 import { exportIcs, exportJson } from '../lib/exporters';
@@ -22,8 +23,8 @@ const INSURANCE_LABELS: Record<MotherInsurance, string> = {
   other: 'その他・未確認',
 };
 
-export default function Settings({ user, household, tasks, items }: {
-  user: User; household: Household; tasks: TaskInstance[]; items: PurchaseItem[];
+export default function Settings({ user, household, tasks, items, sync }: {
+  user: User; household: Household; tasks: TaskInstance[]; items: PurchaseItem[]; sync: SyncState;
 }) {
   const { notify } = useToast();
   const normalizedProfile = normalizeHouseholdProfile(household.profile);
@@ -56,8 +57,13 @@ export default function Settings({ user, household, tasks, items }: {
   // 全削除ダイアログからも呼べるよう関数にしておく（勧めるだけで導線が無いのを避ける）
   const downloadBackup = async (): Promise<void> => {
     try {
-      const allRecords = await loadAllRecords(household.id);
-      exportJson(household, tasks, items, allRecords);
+      const { records, fromCache } = await loadAllRecords(household.id);
+      if (fromCache) {
+        // 欠けたバックアップは、壊れたときに気づけないぶん無いより危険
+        notify('サーバーに接続できないため中止しました。キャッシュだけでは記録が欠けたファイルになります。');
+        return;
+      }
+      exportJson(household, tasks, items, records);
     } catch (error: unknown) {
       notify(describeWriteError(error));
     }
@@ -67,6 +73,28 @@ export default function Settings({ user, household, tasks, items }: {
   return (
     <div className="mx-auto w-full max-w-md space-y-6 px-5 pt-8 md:max-w-xl lg:max-w-5xl lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
       <h1 className="font-display text-xl font-bold text-ink lg:col-span-2">設定</h1>
+
+      <section className="rounded-2xl bg-white p-5 border border-ink/10 lg:col-span-2">
+        <h2 className="font-display font-bold text-ink">同期</h2>
+        <p className="mt-2 flex items-center gap-2 text-sm">
+          <span
+            aria-hidden
+            className={`h-2 w-2 shrink-0 rounded-full ${
+              sync.fromCache ? 'bg-alert' : sync.hasPendingWrites ? 'bg-sub' : 'bg-ink'
+            }`}
+          />
+          {sync.fromCache
+            ? 'サーバーに接続できていません'
+            : sync.hasPendingWrites
+              ? '送信中の変更があります'
+              : 'サーバーと同期しています'}
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-sub">
+          {sync.fromCache
+            ? '表示は端末に保存された内容です。相手が行った変更はまだ届いていません。'
+            : '相手の変更がこの画面に届いています。'}
+        </p>
+      </section>
 
       <section className="rounded-2xl bg-white p-5 border border-ink/10">
         <h2 className="font-display font-bold text-ink">世帯</h2>
