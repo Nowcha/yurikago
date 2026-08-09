@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type User,
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+  signOut, onAuthStateChanged, type User,
 } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
@@ -41,8 +42,45 @@ export const db = initializeFirestore(app, {
 export function watchAuth(cb: (user: User | null) => void) {
   return onAuthStateChanged(auth, cb);
 }
-export function login() {
-  return signInWithPopup(auth, new GoogleAuthProvider());
+/** ホーム画面から起動したPWAか（iOSはnavigator.standaloneでしか判定できない） */
+function isStandaloneApp(): boolean {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
+
+function popupUnavailable(error: unknown): boolean {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code: unknown }).code)
+    : '';
+  if (code === 'auth/popup-blocked') return true;
+  if (code === 'auth/operation-not-supported-in-this-environment') return true;
+  // standaloneではポップアップが開いた直後に死ぬことがあり、自分で閉じた場合と
+  // 同じコードになる。通常のブラウザでは意図的な操作なのでリダイレクトしない
+  return code === 'auth/popup-closed-by-user' && isStandaloneApp();
+}
+
+/**
+ * ポップアップを優先し、使えない環境でだけリダイレクトへ落とす。
+ * standaloneでも先にポップアップを試すのは、iOS 16.4以降は成功する場合があり、
+ * 動く経路をこちらから壊さないため。
+ */
+export async function login(): Promise<void> {
+  const provider = new GoogleAuthProvider();
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error: unknown) {
+    if (!popupUnavailable(error)) throw error;
+    await signInWithRedirect(auth, provider);
+  }
+}
+
+/**
+ * リダイレクト経由のログイン結果を回収する。
+ * 成功はonAuthStateChangedが拾うが、失敗はここでしか観測できない。
+ * 呼ばないとリダイレクトで失敗したとき無言でログイン画面に戻る。
+ */
+export function consumeRedirectResult(): Promise<unknown> {
+  return getRedirectResult(auth);
 }
 export function logout() {
   return signOut(auth);
