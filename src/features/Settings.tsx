@@ -3,8 +3,9 @@ import type { User } from 'firebase/auth';
 import type { Household, MotherInsurance, TaskInstance, PurchaseItem } from '../types';
 import {
   addPartner, removePartner, isValidUid, updateHouseholdSettings, logout, importBackup,
-  deleteHouseholdData, loadAllRecords, syncMasterData,
+  deleteHouseholdData, loadAllRecords, syncMasterData, type SyncState,
 } from '../lib/store';
+import SyncBanner from '../components/SyncBanner';
 import { exportIcs, exportJson } from '../lib/exporters';
 import { normalizeHouseholdProfile } from '../lib/profile';
 
@@ -48,8 +49,8 @@ function describeWriteError(error: unknown): string {
   return code ? `保存できませんでした（${code}）。` : '保存できませんでした。もう一度お試しください。';
 }
 
-export default function Settings({ user, household, tasks, items }: {
-  user: User; household: Household; tasks: TaskInstance[]; items: PurchaseItem[];
+export default function Settings({ user, household, tasks, items, sync }: {
+  user: User; household: Household; tasks: TaskInstance[]; items: PurchaseItem[]; sync: SyncState;
 }) {
   const normalizedProfile = normalizeHouseholdProfile(household.profile);
   const [partnerUid, setPartnerUid] = useState('');
@@ -79,6 +80,8 @@ export default function Settings({ user, household, tasks, items }: {
   return (
     <div className="space-y-6 px-5 pt-8">
       <h1 className="font-display text-xl font-bold text-ink">設定</h1>
+
+      <SyncBanner sync={sync} />
 
       <section className="rounded-2xl bg-white p-5 border border-ink/10">
         <h2 className="font-display font-bold text-ink">世帯</h2>

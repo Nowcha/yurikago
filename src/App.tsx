@@ -4,7 +4,9 @@ import type { Household, TaskInstance, PurchaseItem, CareRecord } from './types'
 import {
   Home, ListTodo, Package, NotebookPen, Settings as SettingsIcon, type LucideIcon,
 } from 'lucide-react';
-import { watchAuth, watchMyHousehold, watchTasks, watchItems, watchRecords } from './lib/store';
+import {
+  watchAuth, watchMyHousehold, watchTasks, watchItems, watchRecords, type SyncState,
+} from './lib/store';
 import Setup from './features/Setup';
 import Dashboard from './features/Dashboard';
 import Tasks from './features/Tasks';
@@ -37,13 +39,18 @@ export default function App() {
   const [records, setRecords] = useState<CareRecord[]>([]);
   const [tab, setTab] = useState<Tab>('home');
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [sync, setSync] = useState<SyncState>({ fromCache: true, hasPendingWrites: false });
 
   useEffect(() => watchAuth(setUser), []);
 
   useEffect(() => {
     if (!user) { setHousehold(user === null ? null : undefined); return; }
     setSyncError(null);
-    return watchMyHousehold(user.uid, setHousehold, (e) => setSyncError(e.code));
+    return watchMyHousehold(
+      user.uid,
+      (h, s) => { setHousehold(h); setSync(s); },
+      (e) => setSyncError(e.code),
+    );
   }, [user]);
 
   useEffect(() => {
@@ -63,7 +70,7 @@ export default function App() {
     return <Splash message="読み込み中…" />;
   }
   if (!user || !household) {
-    return <Setup user={user ?? null} />;
+    return <Setup user={user ?? null} sync={sync} />;
   }
 
   const tabs = household.birthDate ? POSTPARTUM_TABS : BASE_TABS;
@@ -80,7 +87,7 @@ export default function App() {
           <Records household={household} records={records} uid={user.uid} />
         )}
         {tab === 'settings' && (
-          <Settings user={user} household={household} tasks={tasks} items={items} />
+          <Settings user={user} household={household} tasks={tasks} items={items} sync={sync} />
         )}
       </main>
       <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-ink/10 bg-white/95 backdrop-blur">

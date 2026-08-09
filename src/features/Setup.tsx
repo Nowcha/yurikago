@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { User } from 'firebase/auth';
 import type { MotherInsurance } from '../types';
-import { login, createHousehold } from '../lib/store';
+import { login, createHousehold, type SyncState } from '../lib/store';
+import SyncBanner from '../components/SyncBanner';
 
 function hasErrorCode(error: unknown): error is { code: string } {
   return typeof error === 'object' && error !== null && 'code' in error;
@@ -35,7 +36,7 @@ function describeAuthError(error: unknown): string | null {
  * 参加フロー: 後から入る側はここで自分のIDを相手に伝え、
  * 先に世帯を作った側が「設定 > 世帯」で登録する（firestore.rules参照）。
  */
-export default function Setup({ user }: { user: User | null }) {
+export default function Setup({ user, sync }: { user: User | null; sync: SyncState }) {
   const [dueDate, setDueDate] = useState('');
   const [name, setName] = useState('わが家');
   const [busy, setBusy] = useState(false);
@@ -82,6 +83,7 @@ export default function Setup({ user }: { user: User | null }) {
         </div>
       ) : (
         <div className="space-y-8">
+          <SyncBanner sync={sync} />
           <section className="rounded-2xl bg-white p-6 border border-ink/10">
             <h2 className="font-display font-bold text-ink">新しく世帯をつくる</h2>
             <label className="mt-4 block text-sm text-ink/70">
