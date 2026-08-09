@@ -71,7 +71,7 @@ export default function Settings({ user, household, tasks, items, sync }: {
   const solo = household.memberUids.length < 2;
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-6 px-5 pt-8 md:max-w-xl lg:max-w-5xl lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+    <div className="mx-auto w-full max-w-md space-y-6 px-5 pt-8 md:max-w-xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
       <h1 className="font-display text-xl font-bold text-ink lg:col-span-2">設定</h1>
 
       <section className="rounded-2xl bg-white p-5 border border-ink/10 lg:col-span-2">

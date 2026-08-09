@@ -38,7 +38,7 @@ export default function Dashboard({
     .reduce((s, i) => s + (i.actualCost ?? i.budget ?? 0), 0);
 
   return (
-    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl">
+    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl">
       {/* PCでは縦に積まず2列に分ける。状況（左）と今すぐやること（右）で分担する */}
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
       <div className="space-y-6">
