@@ -49,7 +49,7 @@ export default function Purchases({ household, items }: {
 
   return (
     <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl xl:flex xl:max-w-[88rem] xl:gap-8">
-      <div className="min-w-0 xl:flex-1">
+      <div className="min-w-0 xl:max-w-3xl xl:flex-1">
       <h1 className="font-display text-xl font-bold text-ink">準備品</h1>
       <div className="mt-3 flex items-baseline gap-3 rounded-2xl bg-white p-4 border border-ink/10">
         <p className="font-display text-2xl font-bold text-sub">¥{spent.toLocaleString()}</p>
@@ -78,7 +78,7 @@ export default function Purchases({ household, items }: {
         return (
           <section key={c.id} className="mt-6">
             <h2 className="text-sm font-bold text-sub">{c.label}</h2>
-            <ul className="mt-2 space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
+            <ul className="mt-2 space-y-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-2 lg:space-y-0">
               {list.map((i) => (
                 <ItemRow
                   key={i.id}
@@ -118,7 +118,7 @@ export default function Purchases({ household, items }: {
 
       {/* 広い画面では一覧を隠さず併置する */}
       {wide && (
-        <aside className="sticky top-8 hidden h-fit max-h-[calc(100dvh-4rem)] w-[26rem] shrink-0 overflow-y-auto rounded-2xl border border-ink/10 bg-white p-6 xl:block">
+        <aside className="sticky top-8 hidden h-fit max-h-[calc(100dvh-4rem)] min-w-[22rem] flex-1 overflow-y-auto rounded-2xl border border-ink/10 bg-white p-6 xl:block">
           {selected ? (
             <>
               <div className="flex items-start justify-between gap-3">

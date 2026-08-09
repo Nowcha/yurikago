@@ -103,7 +103,7 @@ export default function Records({ household, records, uid }: {
   };
 
   return (
-    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl">
+    <div className="mx-auto w-full max-w-md px-5 pt-8 md:max-w-xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl">
       <h1 className="font-display text-xl font-bold text-ink">きろく</h1>
 
       {/* PCでは入力（左）と当日のログ（右）を並べ、記録するたびに縦へ流れないようにする */}
