@@ -1,4 +1,5 @@
-# AGENTS.md
+<!-- GENERATED from CLAUDE.md - do not edit directly. source-sha256: fd52a5920c2650a61f5db4b3f22d0b4114149444fb278aa3c7988e615ea594ee -->
+# CLAUDE.md
 
 ## プロジェクト概要
 
@@ -55,7 +56,7 @@ firestore.rules
 - `afterBirth` タスクは出生日未確定の間は期限を表示せず、prepTasksのみ表示する
 - 手続きマスターの更新時は各エントリの `links` の公式ページをWebFetchで確認し、変更があれば `notes` に確認日付きで反映する（slash command `/verify-procedures` を用意予定）
 
-## slash commands（.Codex/commands/）
+## slash commands（.claude/commands/）
 
 - `/verify-procedures`: procedure-master.json の全linksを巡回し、期限・金額の変更を検出して差分報告
 - `/generate-weekly-info`: 妊娠週次サマリJSON（Phase 1.5）の下書き生成。一般情報のみ、出典必須
