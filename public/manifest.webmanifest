@@ -2,6 +2,7 @@
   "name": "ゆりかご",
   "short_name": "ゆりかご",
   "description": "予定日から逆算する、ふたりの出産準備手帳",
+  "id": "/yurikago/",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#FAFAFA",

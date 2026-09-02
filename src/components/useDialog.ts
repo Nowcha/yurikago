@@ -14,7 +14,11 @@ const FOCUSABLE = [
 export function useDialog(panelRef: RefObject<HTMLElement | null>, onClose: () => void): void {
   // onCloseがインライン関数でも効果を張り直さない（張り直すと入力中にフォーカスを奪う）
   const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  // レンダー中にrefを書き換えるとConcurrent Renderingで壊れうるため、コミット後に更新する。
+  // 依存配列を持たないので毎レンダー後に走り、代入していた頃と同じ鮮度を保つ
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
