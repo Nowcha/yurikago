@@ -8,7 +8,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
-import { doc, setDoc, getDoc, updateDoc, arrayUnion, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, arrayUnion, writeBatch } from 'firebase/firestore';
 
 // Emulator未起動時（npm test 単体実行時）はスイート全体をスキップする
 const hasEmulator = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
@@ -102,5 +102,70 @@ describe.skipIf(!hasEmulator)('households ルール', () => {
     await assertSucceeds(setDoc(doc(alice, 'households/h6/tasks/t2'), { title: 'y' }));
     await assertFails(getDoc(doc(bob, 'households/h6/tasks/t1')));
     await assertFails(setDoc(doc(bob, 'households/h6/tasks/t2'), { title: 'y' }));
+  });
+});
+
+/**
+ * 回帰テスト: 世帯の破棄経路。
+ * かつては本体を物理削除できたため、孤児サブコレクションが残った状態で
+ * 第三者が同じhidの世帯を作り直すと、残存データを全部読めた。
+ * 墓標方式でこの経路を閉じている。ここが緩むと個人データが漏れる。
+ */
+describe.skipIf(!hasEmulator)('世帯の破棄（墓標方式）', () => {
+  const tombstone = { memberUids: [], deletedAt: '2026-09-03T00:00:00.000Z' };
+
+  async function seed(hid: string): Promise<void> {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `households/${hid}`), { ...base, memberUids: ['alice'] });
+      await setDoc(doc(db, `households/${hid}/tasks/t1`), { title: '出生届', secret: 'PII' });
+    });
+  }
+
+  it('メンバーでも世帯本体は物理削除できない', async () => {
+    await seed('d1');
+    const alice = env.authenticatedContext('alice').firestore();
+    await assertFails(deleteDoc(doc(alice, 'households/d1')));
+  });
+
+  it('メンバーは墓標化できる', async () => {
+    await seed('d2');
+    const alice = env.authenticatedContext('alice').firestore();
+    await assertSucceeds(setDoc(doc(alice, 'households/d2'), tombstone));
+  });
+
+  it('墓標に個人データを残すことはできない', async () => {
+    await seed('d3');
+    const alice = env.authenticatedContext('alice').firestore();
+    // nameやdueDateを道連れにできると「すべて削除」が嘘になる
+    await assertFails(
+      setDoc(doc(alice, 'households/d3'), { ...tombstone, name: 'のこる', dueDate: '2026-10-01' }),
+    );
+    // memberUidsが空でなければ墓標ではない（通常のupdate条件も満たさない）
+    await assertFails(
+      setDoc(doc(alice, 'households/d3'), { memberUids: ['mallory'], deletedAt: tombstone.deletedAt }),
+    );
+  });
+
+  it('墓標化しても孤児タスクは第三者に読めない', async () => {
+    await seed('d4');
+    const alice = env.authenticatedContext('alice').firestore();
+    await assertSucceeds(setDoc(doc(alice, 'households/d4'), tombstone));
+
+    // hidを知る第三者（外された元パートナーを想定）
+    const mallory = env.authenticatedContext('mallory').firestore();
+    // 墓標が居座るので世帯を作り直せない ← これが経路を塞いでいる要
+    await assertFails(setDoc(doc(mallory, 'households/d4'), { ...base, memberUids: ['mallory'] }));
+    await assertFails(getDoc(doc(mallory, 'households/d4/tasks/t1')));
+  });
+
+  it('墓標は本人にも復活・削除できない', async () => {
+    await seed('d5');
+    const alice = env.authenticatedContext('alice').firestore();
+    await assertSucceeds(setDoc(doc(alice, 'households/d5'), tombstone));
+
+    await assertFails(updateDoc(doc(alice, 'households/d5'), { memberUids: ['alice'] }));
+    await assertFails(deleteDoc(doc(alice, 'households/d5')));
+    await assertFails(getDoc(doc(alice, 'households/d5/tasks/t1')));
   });
 });

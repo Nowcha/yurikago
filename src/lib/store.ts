@@ -523,16 +523,26 @@ export async function importBackup(householdId: string, payload: BackupPayload) 
   await commitInChunks(ops);
 }
 
-/** 世帯データ全削除（サブコレクション→本体の順） */
+/**
+ * 世帯データ全削除（サブコレクション→本体の順）。
+ * 本体は物理削除せず墓標にする。firestore.rules のコメントを参照。
+ */
 export async function deleteHouseholdData(
   householdId: string, tasks: TaskInstance[], items: PurchaseItem[],
 ): Promise<void> {
-  const { records } = await loadAllRecords(householdId);
+  const { records, fromCache } = await loadAllRecords(householdId);
+  // キャッシュだけで消すと、読めていない記録が消し残る。本体が墓標になれば
+  // その記録には二度と手が届かず、サーバー上に永久に残る（バックアップと同じ理由で中止する）
+  if (fromCache) throw new Error('delete-needs-server');
   const ops: ((b: ReturnType<typeof writeBatch>) => void)[] = [];
   for (const t of tasks) ops.push((b) => b.delete(doc(db, 'households', householdId, 'tasks', t.id)));
   for (const i of items) ops.push((b) => b.delete(doc(db, 'households', householdId, 'items', i.id)));
   for (const r of records) ops.push((b) => b.delete(doc(db, 'households', householdId, 'records', r.id)));
-  ops.push((b) => b.delete(doc(db, 'households', householdId)));
+  // update()ではなくset()。マージだとname/dueDate/memberNamesが墓標に残ってしまう
+  ops.push((b) => b.set(doc(db, 'households', householdId), {
+    memberUids: [],
+    deletedAt: new Date().toISOString(),
+  }));
   await commitInChunks(ops);
 }
 
