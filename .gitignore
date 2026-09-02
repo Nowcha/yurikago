@@ -2,3 +2,8 @@ node_modules
 dist
 .firebase
 *.log
+
+# 秘密情報。このリポジトリはpublicなので、取り違えて置いた場合の保険として明示的に除外する
+.env
+.env.*
+!.env.example

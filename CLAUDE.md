@@ -31,23 +31,29 @@
 ```
 src/
   data/            # 静的マスター（procedure-master.json, purchase-master.json, weekly-info.json）
-  lib/             # firebase初期化, 日付計算(trigger→期限解決), ics生成
-  features/
-    tasks/         # タスク一覧・詳細・タイムライン
-    purchases/     # 購入計画
-    dashboard/     # ホーム
-    household/     # 世帯作成・メンバー追加・設定
-  types/           # TaskTemplate, TaskInstance, PurchaseItem 等（docs/requirements.md §4.2と同期）
+  lib/             # store.ts(firebase初期化+Firestore操作), deadline.ts(trigger→期限解決),
+                   # exporters.ts(ics/JSON), sync.ts, overview.ts, records.ts, profile.ts 等
+  hooks/           # useUrlState, useMediaQuery, useOnlineStatus
+  components/      # ConfirmDialog, Sheet, SyncBanner, Toast, useDialog
+  features/        # 画面単位で1ファイル。Dashboard/Tasks/Purchases/Records/Settings/Setup.tsx
+  types.ts         # TaskTemplate, TaskInstance, PurchaseItem 等（docs/requirements.md §4.2と同期）
+scripts/           # assert-emulator.mjs（test:rules の前置き検査）
 docs/
   requirements.md  # 要件定義書（正）
 firestore.rules
+eslint.config.js
 ```
+
+機能別サブディレクトリは作っていない。画面数が少ないうちはフラットのほうが探しやすいため。
 
 ## 開発コマンド
 
 - `npm run dev` / `npm run build` / `npm run preview`
+- `npm run lint` — ESLint（flat config）。`any` 禁止をルールで強制している
 - `npm run test` — Vitest。**期限計算ロジック（trigger→日付解決）は必ずユニットテストを書く**（14日/15日期限の計算ミスは実害が大きい）
-- `npm run test:rules` — Firestore Emulatorでセキュリティルールのテスト（@firebase/rules-unit-testing）
+- `npm run test:rules` — Firestore Emulatorでセキュリティルールのテスト（@firebase/rules-unit-testing）。
+  `npm run test` 単体では rules.test.ts はスキップされる。**スキップは「検証して通った」ではない**ので、
+  ルールを触ったときは必ずこちらを実行すること
 
 ## ドメイン知識（実装時の注意）
 
