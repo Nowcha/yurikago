@@ -23,6 +23,11 @@ export function describeWriteError(error: unknown): string {
     return 'サーバーに反映できませんでした。画面上は変わって見えても、相手にはまだ届いていません。'
       + '通信状況を確認してから、この画面を開き直して結果を確認してください。';
   }
+  if (error instanceof Error && error.message === 'delete-needs-server') {
+    return 'サーバーに接続できないため中止しました。'
+      + 'キャッシュだけで消すと、読めていない記録がサーバーに消し残ります。'
+      + '通信状況を確認してからもう一度お試しください。';
+  }
   const code = typeof error === 'object' && error !== null && 'code' in error
     ? String((error as { code: unknown }).code)
     : undefined;

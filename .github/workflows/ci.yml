@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # ベースブランチとの差分を取るため（rules変更の検出に使う）
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -32,3 +34,17 @@ jobs:
         run: npm run test:rules
       - name: Build
         run: npm run build
+      # ルールの配備はGitHub Pagesと違って自動化していない。
+      # 自動化にはCIへ認証情報を置く必要があり、zero-API-key原則（CLAUDE.md）に反するため。
+      # 配備を忘れるとリポジトリだけ直って本番は脆弱なまま残るので、PR上で警告する
+      - name: Warn if firestore.rules changed
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}...HEAD" \
+            | grep -qx 'firestore.rules'; then
+            echo "::warning file=firestore.rules::firestore.rules が変更されています。マージ後に npm run deploy:rules を実行しないと本番のルールは古いままです。"
+            {
+              echo "### ⚠️ firestore.rules が変更されています"
+              echo ""
+              echo 'マージ後に `npm run deploy:rules` を実行してください。実行するまで本番のルールは古いままです。'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

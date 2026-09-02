@@ -43,9 +43,20 @@ service cloud.firestore {
         && request.auth.uid in request.resource.data.memberUids
         && request.resource.data.memberUids.size() <= 2;
 
-      // 削除: メンバーのみ
-      allow delete: if isSignedIn()
-        && request.auth.uid in resource.data.memberUids;
+      // 世帯の破棄は「削除」ではなく墓標化する。
+      // deleteDoc()はサブコレクションを消さないので、本体だけ消すとtasks/items/recordsが
+      // 孤児として残る。その状態では誰でも同じhidで世帯を作り直せ、isMember()が通って
+      // 残存データが読めてしまう（エミュレータで再現確認済み）。
+      // 墓標が居座ればcreateは「既存ドキュメントへの書き込み」になって成立せず、経路が閉じる。
+      // 「すべて削除」が嘘にならないよう、墓標に残せるキーは以下の2つだけに制限する。
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.memberUids
+        && request.resource.data.keys().hasOnly(['memberUids', 'deletedAt'])
+        && request.resource.data.memberUids.size() == 0
+        && request.resource.data.deletedAt is string;
+
+      // 本体の物理削除は許可しない。墓標を消せると再作成経路が復活するため、
+      // memberUidsが空になった時点でこのドキュメントは誰にも触れなくなる（＝墓標は不変）
 
       // サブコレクション（tasks / items / records）: 世帯メンバーのみ全操作可。
       // createは初回世帯作成バッチ内の親ドキュメントも参照できるようgetAfter()で判定する
