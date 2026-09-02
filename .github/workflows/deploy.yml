@@ -6,6 +6,11 @@ permissions:
   contents: read
   pages: write
   id-token: write
+# 連続pushでデプロイが競合すると、後から始まった古いビルドが公開されうる。
+# 走行中のものは最後まで走らせる（cancel-in-progress: false）のがPages公式の推奨
+concurrency:
+  group: pages
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
       - uses: actions/setup-java@v4
         with:

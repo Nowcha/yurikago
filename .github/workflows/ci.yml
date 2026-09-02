@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0 # ベースブランチとの差分を取るため（rules変更の検出に使う）
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
       # Firestoreエミュレータ（test:rules）にJavaが要る
       - uses: actions/setup-java@v4
@@ -26,6 +26,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
+      - name: Lint
+        run: npm run lint
       - name: Type check
         run: npx tsc --noEmit
       - name: Unit tests

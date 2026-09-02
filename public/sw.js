@@ -1,11 +1,41 @@
-const CACHE = 'yurikago-v3';
+const CACHE = 'yurikago-v4';
+// github.ioはユーザー単位で1オリジン。Cache Storageはスコープではなくオリジンで
+// 分割されるため、絞り込まないと同じアカウントの別プロジェクトのキャッシュまで消える
+const CACHE_PREFIX = 'yurikago-';
 
-self.addEventListener('install', () => self.skipWaiting());
+/**
+ * アプリシェルを先読みする。
+ * SWはページ読み込み後に登録されるので、初回訪問のHTML・JS・CSSはSWの管理外で
+ * 取得されており、キャッシュに入っていない。そのため初回訪問の直後にオフラインへ
+ * 移ると、次の起動でシェルが無く何も表示できなかった。
+ * アセット名はビルド時のハッシュ付きでSW側からは分からないため、シェルHTMLから読み取る。
+ */
+async function precacheAppShell() {
+  const shell = new URL('./', self.registration.scope).href;
+  const res = await fetch(shell, { cache: 'no-cache' });
+  if (!res.ok) return;
+  const cache = await caches.open(CACHE);
+  await cache.put(shell, res.clone()); // 消費する前にcloneする
+  const html = await res.text();
+  const assets = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)]
+    .map((m) => new URL(m[1], shell).href)
+    .filter((url) => url.startsWith(self.registration.scope));
+  await cache.addAll(assets);
+}
+
+self.addEventListener('install', (e) => {
+  // 先読みが失敗してもインストールは止めない。従来どおり実行時キャッシュで動作する
+  e.waitUntil(
+    precacheAppShell().catch(() => {}).then(() => self.skipWaiting()),
+  );
+});
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(
+        keys.filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE).map((k) => caches.delete(k)),
+      ))
       .then(() => self.clients.claim()),
   );
 });
