@@ -12,6 +12,9 @@ import {
   parsePositiveMeasurement, summarizeCareDay, type CareDayWindow,
 } from '../lib/records';
 import { addDays, todayYmd } from '../lib/deadline';
+import {
+  calcMilkPlan, MILK_FEEDINGS_PER_DAY, MILK_ML_PER_KG_MAX, MILK_ML_PER_KG_MIN,
+} from '../lib/milk';
 
 const TYPE_META: Record<CareRecordType, { label: string; needsValue?: 'ml' | 'temp' | 'weight' | 'text' }> = {
   breast_l: { label: '母乳 左' },
@@ -78,6 +81,10 @@ export default function Records({ household, records, uid }: {
     [records],
   );
   const sleeping = lastSleepState?.type === 'sleep';
+  const latestWeightG = useMemo(
+    () => records.find((r) => r.type === 'weight' && r.weightG != null)?.weightG,
+    [records],
+  );
 
   const enqueueRecord = (record: Omit<CareRecord, 'id'>): boolean => {
     setRecordError(null);
@@ -174,6 +181,8 @@ export default function Records({ household, records, uid }: {
         </button>
       </div>
 
+      <MilkCalculator latestWeightG={latestWeightG} />
+
       </div>
 
       <div>
@@ -217,6 +226,59 @@ function QuickBtn({ icon: Icon, label, onTap, emph }: {
       <Icon size={22} strokeWidth={1.6} aria-hidden />
       {label}
     </button>
+  );
+}
+
+function MilkCalculator({ latestWeightG }: { latestWeightG?: number }) {
+  const [weight, setWeight] = useState(
+    latestWeightG != null ? String(Math.round(latestWeightG) / 1000) : '',
+  );
+  const kg = parsePositiveMeasurement(weight);
+  const plan = kg != null ? calcMilkPlan(kg) : null;
+
+  return (
+    <section className="mt-7">
+      <h2 className="text-sm font-bold text-sub">ミルク量の目安</h2>
+      <div className="mt-2 rounded-2xl border border-ink/10 bg-white p-4">
+        <label className="block text-xs text-sub" htmlFor="milk-weight">体重（kg）</label>
+        <input
+          id="milk-weight"
+          type="number"
+          inputMode="decimal"
+          min="0.1"
+          step="0.01"
+          value={weight}
+          onChange={(e) => setWeight(e.target.value)}
+          placeholder="3.2"
+          className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-4 py-3 text-lg"
+        />
+        {latestWeightG != null && (
+          <p className="mt-1.5 text-[11px] text-sub">最新の体重記録（{latestWeightG}g）から入力済みです</p>
+        )}
+        {plan ? (
+          <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-ink/10 bg-ink/10 text-center">
+            <div className="bg-white px-1 py-3">
+              <dt className="text-[10px] text-sub">1日の量</dt>
+              <dd className="mt-0.5 font-display text-sm font-bold text-ink">
+                {plan.dailyMinMl}〜{plan.dailyMaxMl}ml
+              </dd>
+            </div>
+            <div className="bg-white px-1 py-3">
+              <dt className="text-[10px] text-sub">1回の量（{MILK_FEEDINGS_PER_DAY}回/日）</dt>
+              <dd className="mt-0.5 font-display text-sm font-bold text-ink">
+                {plan.perFeedMinMl}〜{plan.perFeedMaxMl}ml
+              </dd>
+            </div>
+          </dl>
+        ) : (
+          weight.trim() && <p className="mt-3 text-sm text-alert">0より大きい数値を入力してください。</p>
+        )}
+        <p className="mt-3 text-[11px] leading-relaxed text-sub">
+          体重1kgあたり{MILK_ML_PER_KG_MIN}〜{MILK_ML_PER_KG_MAX}ml/日の目安で計算しています。
+          母乳との併用や月齢で適量は変わるため、小児科・助産師の指示を優先してください。
+        </p>
+      </div>
+    </section>
   );
 }
 
