@@ -16,6 +16,17 @@ export function findLastFeeding(records: CareRecord[]): CareRecord | undefined {
   );
 }
 
+/**
+ * 授乳回数。同じ時刻（分単位）の母乳・ミルク・搾母乳は、続けて飲ませた1回として数える
+ */
+export function countFeedingSessions(records: CareRecord[]): number {
+  return new Set(
+    records
+      .filter((record) => FEEDING_TYPES.includes(record.type))
+      .map((record) => Math.floor(record.at / 60_000)),
+  ).size;
+}
+
 export interface CareDaySummary {
   feedingCount: number;
   breastMinutes: number;
@@ -40,7 +51,7 @@ export function parsePositiveMeasurement(value: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function positiveValue(value: number | undefined): number {
+export function positiveValue(value: number | undefined): number {
   return value != null && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
@@ -107,8 +118,7 @@ export function summarizeCareDay(
       ? positiveValue(record.durationMin)
       : 0;
     return {
-      feedingCount: current.feedingCount
-        + (FEEDING_TYPES.includes(record.type) ? 1 : 0),
+      feedingCount: 0,
       breastMinutes: current.breastMinutes + breastMinutes,
       formulaMl: current.formulaMl + formulaMl,
       expressedMl: current.expressedMl + expressedMl,
@@ -127,5 +137,9 @@ export function summarizeCareDay(
     peeCount: 0,
     poopCount: 0,
   });
-  return { ...summary, sleepMinutes: summarizeSleepMinutes(records, window) };
+  return {
+    ...summary,
+    feedingCount: countFeedingSessions(dayRecords),
+    sleepMinutes: summarizeSleepMinutes(records, window),
+  };
 }

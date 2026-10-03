@@ -4,14 +4,20 @@ import {
   StickyNote, Pill, Syringe, X, Pencil, ChevronLeft, ChevronRight, type LucideIcon,
 } from 'lucide-react';
 import type { Household, CareRecord, CareRecordType } from '../types';
-import { addRecord, removeRecord, replaceRecord, watchRecordsForDay } from '../lib/store';
+import {
+  addRecord, removeRecord, replaceRecord, setBreastMlPerMin, watchRecordsForDay,
+} from '../lib/store';
 import Sheet from '../components/Sheet';
+import FeedingVolumeChart from '../components/FeedingVolumeChart';
 import { useToast } from '../components/Toast';
 import { describeWriteError } from '../lib/sync';
 import {
   buildSleepIntervals, findLastFeeding, parsePositiveMeasurement, summarizeCareDay, type CareDayWindow,
 } from '../lib/records';
 import { addDays, todayYmd } from '../lib/deadline';
+import {
+  buildDailyVolumes, DEFAULT_BREAST_ML_PER_MIN, resolveBreastMlPerMin, summarizeFeedingVolume,
+} from '../lib/feedingVolume';
 import {
   calcMilkPlan, MILK_FEEDINGS_PER_DAY, MILK_ML_PER_KG_MAX, MILK_ML_PER_KG_MIN,
 } from '../lib/milk';
@@ -181,6 +187,8 @@ export default function Records({ household, records, uid }: {
         </button>
       </div>
 
+      <VolumeTrend household={household} records={records} />
+
       <MilkCalculator latestWeightG={latestWeightG} />
 
       </div>
@@ -226,6 +234,82 @@ function QuickBtn({ icon: Icon, label, onTap, emph }: {
       <Icon size={22} strokeWidth={1.6} aria-hidden />
       {label}
     </button>
+  );
+}
+
+const VOLUME_RANGES = [7, 14, 30] as const;
+
+function VolumeTrend({ household, records }: { household: Household; records: CareRecord[] }) {
+  const { notify } = useToast();
+  const [range, setRange] = useState<(typeof VOLUME_RANGES)[number]>(7);
+  const rate = resolveBreastMlPerMin(household.breastMlPerMin);
+  const [rateInput, setRateInput] = useState(String(rate));
+
+  const today = todayYmd();
+  // 購読は新しい順に1000件まで。上限に達しているときは、読み込めた最古の日以前は欠けるので出さない
+  const loadedFrom = records.length >= 1000
+    ? ymdOf(records[records.length - 1].at)
+    : null;
+  const days = Array.from({ length: range }, (_, i) => addDays(today, i - (range - 1)))
+    .filter((day) => loadedFrom == null || day > loadedFrom);
+  const volumes = buildDailyVolumes(records, days.map((day) => ({ day, ...careDayWindow(day) })), rate);
+
+  const saveRate = (): void => {
+    const next = parsePositiveMeasurement(rateInput);
+    if (next == null) {
+      setRateInput(String(rate));
+      return;
+    }
+    if (next === rate) return;
+    void setBreastMlPerMin(household.id, next).catch((error: unknown) => notify(describeWriteError(error)));
+  };
+
+  return (
+    <section className="mt-7">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-bold text-sub">のんだ量の推移</h2>
+        <div className="flex gap-1" role="group" aria-label="表示する日数">
+          {VOLUME_RANGES.map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setRange(n)}
+              aria-pressed={range === n}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                range === n ? 'border-ink bg-ink text-white' : 'border-ink/10 bg-white text-ink hover:bg-surface'
+              }`}
+            >
+              {n}日
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-2 rounded-2xl border border-ink/10 bg-white p-4">
+        <FeedingVolumeChart volumes={volumes} />
+        <div className="mt-4 flex items-center gap-2 border-t border-ink/10 pt-3">
+          <label htmlFor="breast-ml-per-min" className="text-xs text-sub">母乳の推定：授乳1分あたり</label>
+          <input
+            id="breast-ml-per-min"
+            type="number"
+            inputMode="decimal"
+            min="0.1"
+            step="0.1"
+            value={rateInput}
+            onChange={(e) => setRateInput(e.target.value)}
+            onBlur={saveRate}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+            }}
+            className="w-16 rounded-lg border border-ink/15 bg-base px-2 py-1.5 text-sm"
+          />
+          <span className="text-xs text-sub">ml</span>
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-sub">
+          母乳は量を測れないため、授乳時間（分）×この値で推定しています（初期値{DEFAULT_BREAST_ML_PER_MIN}ml/分は仮の値）。
+          授乳時間が未入力の記録は0として数えます。搾乳（搾っただけ）は含めません。
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -299,7 +383,7 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
       <h2 className="text-sm font-bold text-sub">{heading}（{records.length}件）</h2>
       {!loading && !hasError && (
         <>
-          <DaySummary records={contextRecords} selectedDay={selectedDay} />
+          <DaySummary records={contextRecords} selectedDay={selectedDay} breastMlPerMin={resolveBreastMlPerMin(household.breastMlPerMin)} />
           <DayTimeline records={contextRecords} selectedDay={selectedDay} />
         </>
       )}
@@ -368,8 +452,15 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
   );
 }
 
-function DaySummary({ records, selectedDay }: { records: CareRecord[]; selectedDay: string }) {
-  const summary = summarizeCareDay(records, careDayWindow(selectedDay));
+function DaySummary({ records, selectedDay, breastMlPerMin }: {
+  records: CareRecord[]; selectedDay: string; breastMlPerMin: number;
+}) {
+  const window = careDayWindow(selectedDay);
+  const summary = summarizeCareDay(records, window);
+  const volume = summarizeFeedingVolume(
+    records.filter((record) => record.at >= window.startAt && record.at < window.endAt),
+    breastMlPerMin,
+  );
   const rows = [
     ['授乳', `${summary.feedingCount}回`],
     ['母乳', `${summary.breastMinutes}分`],
@@ -381,6 +472,7 @@ function DaySummary({ records, selectedDay }: { records: CareRecord[]; selectedD
     ['うんち', `${summary.poopCount}回`],
   ];
   return (
+    <>
     <dl className="mt-2 grid grid-cols-4 gap-px overflow-hidden rounded-xl border border-ink/10 bg-ink/10 text-center">
       {rows.map(([label, value]) => (
         <div key={label} className="min-w-0 bg-white px-1 py-3">
@@ -389,6 +481,14 @@ function DaySummary({ records, selectedDay }: { records: CareRecord[]; selectedD
         </div>
       ))}
     </dl>
+    <p className="mt-2 rounded-xl border border-ink/10 bg-white px-3 py-2.5 text-xs text-sub">
+      のんだ量 合計
+      <span className="ml-2 font-display text-sm font-bold text-ink">{volume.totalMl}ml</span>
+      <span className="ml-2">
+        母乳（推定）{volume.breastMl} + ミルク {volume.formulaMl} + 搾母乳 {volume.expressedMl}
+      </span>
+    </p>
+    </>
   );
 }
 
@@ -653,6 +753,11 @@ function ValueSheet({ type, onSave, onClose }: {
         </button>
     </Sheet>
   );
+}
+
+function ymdOf(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function hhmm(ms: number): string {

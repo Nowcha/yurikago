@@ -196,6 +196,11 @@ export function isValidUid(uid: string): boolean {
   return UID_PATTERN.test(uid);
 }
 
+/** 母乳の推定量（授乳1分あたりのml）。二人の画面で同じ値を使うため世帯ドキュメントに持つ */
+export function setBreastMlPerMin(householdId: string, value: number) {
+  return updateDoc(doc(db, 'households', householdId), { breastMlPerMin: value });
+}
+
 /** パートナー追加（UID登録方式、firestore.rules参照） */
 export function addPartner(householdId: string, partnerUid: string, partnerName: string) {
   return updateDoc(doc(db, 'households', householdId), {

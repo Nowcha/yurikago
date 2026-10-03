@@ -79,6 +79,7 @@ export interface Household {
   memberUids: string[];
   memberNames: Record<string, string>;
   profile?: HouseholdProfile;
+  breastMlPerMin?: number; // 母乳の推定量（授乳1分あたりのml）。世帯で共有
 }
 
 export type CareRecordType =
