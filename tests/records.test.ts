@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { buildSleepIntervals, findLastFeeding, parsePositiveMeasurement, summarizeCareDay } from '../src/lib/records';
+import { buildSleepIntervals, countFeedingSessions, findLastFeeding, parsePositiveMeasurement, summarizeCareDay } from '../src/lib/records';
 import type { CareRecord } from '../src/types';
 
-function record(id: string, type: CareRecord['type'], amountMl?: number): CareRecord {
-  return { id, type, at: 0, ...(amountMl == null ? {} : { amountMl }) };
+const MINUTE = 60_000;
+
+function record(id: string, type: CareRecord['type'], amountMl?: number, at = 0): CareRecord {
+  return { id, type, at, ...(amountMl == null ? {} : { amountMl }) };
 }
 
 describe('summarizeCareDay', () => {
   it('授乳記録・ミルク量・排泄回数を集計する', () => {
     const records = [
-      record('1', 'breast_l'),
-      record('2', 'breast_r'),
-      record('3', 'formula', 80),
-      record('4', 'formula', 60),
+      record('1', 'breast_l', undefined, 1 * MINUTE),
+      record('2', 'breast_r', undefined, 2 * MINUTE),
+      record('3', 'formula', 80, 3 * MINUTE),
+      record('4', 'formula', 60, 4 * MINUTE),
       record('5', 'pump', 40),
       record('6', 'pee'),
       record('7', 'pee'),
@@ -125,14 +127,37 @@ describe('findLastFeeding', () => {
 
   it('搾母乳は授乳回数と量に集計される', () => {
     const records: CareRecord[] = [
-      { id: '1', type: 'expressed', at: 1, amountMl: 60 },
-      { id: '2', type: 'expressed', at: 2, amountMl: -5 },
-      { id: '3', type: 'pump', at: 3, amountMl: 90 },
+      { id: '1', type: 'expressed', at: 1 * MINUTE, amountMl: 60 },
+      { id: '2', type: 'expressed', at: 2 * MINUTE, amountMl: -5 },
+      { id: '3', type: 'pump', at: 3 * MINUTE, amountMl: 90 },
     ];
     const summary = summarizeCareDay(records);
     expect(summary.feedingCount).toBe(2);
     expect(summary.expressedMl).toBe(60);
     expect(summary.pumpMl).toBe(90);
+  });
+});
+
+describe('授乳回数（同じ時刻は1回）', () => {
+  it('同じ分の母乳・ミルク・搾母乳は複数あっても1回', () => {
+    const at = 10 * MINUTE;
+    const records: CareRecord[] = [
+      { id: '1', type: 'breast_l', at },
+      { id: '2', type: 'breast_r', at: at + 20_000 },
+      { id: '3', type: 'formula', at: at + 40_000, amountMl: 40 },
+      { id: '4', type: 'expressed', at, amountMl: 30 },
+    ];
+    expect(countFeedingSessions(records)).toBe(1);
+  });
+
+  it('分が違えば別の回、搾乳(pump)だけの時刻は数えない', () => {
+    const records: CareRecord[] = [
+      { id: '1', type: 'formula', at: 10 * MINUTE },
+      { id: '2', type: 'breast_l', at: 11 * MINUTE },
+      { id: '3', type: 'pump', at: 12 * MINUTE },
+    ];
+    expect(countFeedingSessions(records)).toBe(2);
+    expect(summarizeCareDay(records).feedingCount).toBe(2);
   });
 });
 
