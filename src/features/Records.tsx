@@ -9,7 +9,7 @@ import Sheet from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { describeWriteError } from '../lib/sync';
 import {
-  parsePositiveMeasurement, summarizeCareDay, type CareDayWindow,
+  buildSleepIntervals, parsePositiveMeasurement, summarizeCareDay, type CareDayWindow,
 } from '../lib/records';
 import { addDays, todayYmd } from '../lib/deadline';
 import {
@@ -298,7 +298,10 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
     <section className="mt-7 lg:mt-0">
       <h2 className="text-sm font-bold text-sub">{heading}（{records.length}件）</h2>
       {!loading && !hasError && (
-        <DaySummary records={contextRecords} selectedDay={selectedDay} />
+        <>
+          <DaySummary records={contextRecords} selectedDay={selectedDay} />
+          <DayTimeline records={contextRecords} selectedDay={selectedDay} />
+        </>
       )}
       <ul className="mt-2 divide-y divide-ink/10 rounded-2xl border border-ink/10 bg-white">
         {loading && <li className="p-4 text-sm text-sub">読み込み中…</li>}
@@ -384,6 +387,87 @@ function DaySummary({ records, selectedDay }: { records: CareRecord[]; selectedD
         </div>
       ))}
     </dl>
+  );
+}
+
+const TIMELINE_ROWS: { label: string; types: CareRecordType[] }[] = [
+  { label: '母乳', types: ['breast_l', 'breast_r'] },
+  { label: 'ミルク', types: ['formula'] },
+  { label: 'おしっこ', types: ['pee'] },
+  { label: 'うんち', types: ['poop'] },
+];
+const TIMELINE_HOURS = [0, 6, 12, 18, 24];
+
+/** 1日(0〜24時)を横軸に、授乳・排泄を点、睡眠を帯で並べる。色は使わず墨の濃淡のみ */
+function DayTimeline({ records, selectedDay }: { records: CareRecord[]; selectedDay: string }) {
+  const window = careDayWindow(selectedDay);
+  const span = window.endAt - window.startAt;
+  const pct = (at: number): number => Math.min(100, Math.max(0, ((at - window.startAt) / span) * 100));
+  const inDay = records.filter((r) => r.at >= window.startAt && r.at < window.endAt);
+  const sleeps = buildSleepIntervals(records, window);
+
+  return (
+    <div
+      role="img"
+      aria-label="1日のタイムライン（授乳・排泄・睡眠）"
+      className="mt-2 rounded-xl border border-ink/10 bg-white px-3 py-3"
+    >
+      <div className="grid grid-cols-[3.75rem_1fr] items-center gap-y-1.5">
+        {TIMELINE_ROWS.map((row) => (
+          <TimelineRow key={row.label} label={row.label}>
+            {inDay.filter((r) => row.types.includes(r.type)).map((r) => (
+              <span
+                key={r.id}
+                title={`${hhmm(r.at)} ${TYPE_META[r.type].label}${r.amountMl != null ? ` ${r.amountMl}ml` : ''}`}
+                className="absolute top-1/2 h-3 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink"
+                style={{ left: `${pct(r.at)}%` }}
+              />
+            ))}
+          </TimelineRow>
+        ))}
+        <TimelineRow label="睡眠">
+          {sleeps.map((s) => (
+            <span
+              key={s.startAt}
+              title={`${hhmm(s.startAt)}〜${hhmm(s.endAt)} 睡眠`}
+              className="absolute top-1/2 h-3 -translate-y-1/2 rounded-sm bg-ink/35"
+              style={{ left: `${pct(s.startAt)}%`, width: `${Math.max(0.6, pct(s.endAt) - pct(s.startAt))}%` }}
+            />
+          ))}
+        </TimelineRow>
+        <span />
+        <div className="relative h-4 text-[10px] text-sub">
+          {TIMELINE_HOURS.map((h) => (
+            <span
+              key={h}
+              className={`absolute top-0 ${h === 0 ? '' : h === 24 ? '-translate-x-full' : '-translate-x-1/2'}`}
+              style={{ left: `${(h / 24) * 100}%` }}
+            >
+              {h}時
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TimelineRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <>
+      <span className="text-[10px] text-sub">{label}</span>
+      <div className="relative h-6 border-y border-ink/10">
+        {TIMELINE_HOURS.slice(1, -1).map((h) => (
+          <span
+            key={h}
+            aria-hidden
+            className="absolute inset-y-0 border-l border-ink/10"
+            style={{ left: `${(h / 24) * 100}%` }}
+          />
+        ))}
+        {children}
+      </div>
+    </>
   );
 }
 
