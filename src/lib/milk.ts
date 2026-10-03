@@ -1,3 +1,5 @@
+import type { CareRecord } from '../types';
+
 /** 体重あたりの1日ミルク量の目安（ml/kg/日） */
 export const MILK_ML_PER_KG_MIN = 150;
 export const MILK_ML_PER_KG_MAX = 200;
@@ -26,4 +28,25 @@ export function calcMilkPlan(weightKg: number, feedings = MILK_FEEDINGS_PER_DAY)
     perFeedMinMl: Math.round(dailyMin / feedings),
     perFeedMaxMl: Math.round(dailyMax / feedings),
   };
+}
+
+export interface WeightAsOf {
+  weightG: number;
+  /** その体重を記録した時刻 */
+  at: number;
+}
+
+/**
+ * endAt より前で一番新しい体重記録。指定日に記録が無ければ、それ以前の最新を引き継ぐ。
+ * 入力日ごとの体重を、未入力の日にも反映するための解決規則。
+ */
+export function findWeightAsOf(records: CareRecord[], endAt: number): WeightAsOf | null {
+  return records.reduce<WeightAsOf | null>((latest, record) => {
+    const weightG = record.weightG;
+    if (
+      record.type !== 'weight' || weightG == null || !Number.isFinite(weightG) || weightG <= 0
+      || record.at >= endAt || (latest && record.at <= latest.at)
+    ) return latest;
+    return { weightG, at: record.at };
+  }, null);
 }
