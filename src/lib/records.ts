@@ -27,8 +27,17 @@ function positiveValue(value: number | undefined): number {
   return value != null && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-function summarizeSleepMinutes(records: CareRecord[], window: CareDayWindow | undefined): number {
-  if (!window) return 0;
+export interface SleepInterval {
+  startAt: number;
+  endAt: number;
+}
+
+/** 睡眠記録（sleep/wake）を、窓内に収まる睡眠区間へ変換する。窓の外から続く睡眠・進行中の睡眠も含む */
+export function buildSleepIntervals(
+  records: CareRecord[],
+  window: CareDayWindow | undefined,
+): SleepInterval[] {
+  if (!window) return [];
   const effectiveEnd = Math.max(
     window.startAt,
     Math.min(window.endAt, window.nowAt ?? window.endAt),
@@ -41,7 +50,7 @@ function summarizeSleepMinutes(records: CareRecord[], window: CareDayWindow | un
   const lastBeforeStart = events.filter((event) => event.at < window.startAt).at(-1);
   let sleeping = lastBeforeStart?.type === 'sleep';
   let sleepStartedAt = sleeping ? window.startAt : 0;
-  let totalMs = 0;
+  const intervals: SleepInterval[] = [];
 
   for (const event of events) {
     if (event.at < window.startAt) continue;
@@ -49,11 +58,17 @@ function summarizeSleepMinutes(records: CareRecord[], window: CareDayWindow | un
       sleeping = true;
       sleepStartedAt = event.at;
     } else if (event.type === 'wake' && sleeping) {
-      totalMs += Math.max(0, event.at - sleepStartedAt);
+      intervals.push({ startAt: sleepStartedAt, endAt: Math.max(sleepStartedAt, event.at) });
       sleeping = false;
     }
   }
-  if (sleeping) totalMs += Math.max(0, effectiveEnd - sleepStartedAt);
+  if (sleeping) intervals.push({ startAt: sleepStartedAt, endAt: Math.max(sleepStartedAt, effectiveEnd) });
+  return intervals;
+}
+
+function summarizeSleepMinutes(records: CareRecord[], window: CareDayWindow | undefined): number {
+  const totalMs = buildSleepIntervals(records, window)
+    .reduce((sum, interval) => sum + (interval.endAt - interval.startAt), 0);
   return Math.floor(totalMs / 60_000);
 }
 

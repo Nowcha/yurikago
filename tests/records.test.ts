@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePositiveMeasurement, summarizeCareDay } from '../src/lib/records';
+import { buildSleepIntervals, parsePositiveMeasurement, summarizeCareDay } from '../src/lib/records';
 import type { CareRecord } from '../src/types';
 
 function record(id: string, type: CareRecord['type'], amountMl?: number): CareRecord {
@@ -90,6 +90,36 @@ describe('summarizeCareDay', () => {
       nowAt: startAt + (70 * minute),
     });
     expect(summary.sleepMinutes).toBe(60);
+  });
+});
+
+describe('buildSleepIntervals', () => {
+  const minute = 60_000;
+  const startAt = 1_000 * minute;
+  const endAt = startAt + (24 * 60 * minute);
+
+  it('前日から続く睡眠は窓の先頭から始まる区間になり、複数の区間も返す', () => {
+    const records: CareRecord[] = [
+      { id: '1', type: 'sleep', at: startAt - (30 * minute) },
+      { id: '2', type: 'wake', at: startAt + (60 * minute) },
+      { id: '3', type: 'sleep', at: startAt + (120 * minute) },
+      { id: '4', type: 'wake', at: startAt + (150 * minute) },
+    ];
+    expect(buildSleepIntervals(records, { startAt, endAt })).toEqual([
+      { startAt, endAt: startAt + (60 * minute) },
+      { startAt: startAt + (120 * minute), endAt: startAt + (150 * minute) },
+    ]);
+  });
+
+  it('進行中の睡眠は現在時刻までで打ち切る', () => {
+    const records: CareRecord[] = [{ id: '1', type: 'sleep', at: startAt + (10 * minute) }];
+    expect(buildSleepIntervals(records, { startAt, endAt, nowAt: startAt + (70 * minute) })).toEqual([
+      { startAt: startAt + (10 * minute), endAt: startAt + (70 * minute) },
+    ]);
+  });
+
+  it('窓が無ければ空', () => {
+    expect(buildSleepIntervals([{ id: '1', type: 'sleep', at: 0 }], undefined)).toEqual([]);
   });
 });
 
