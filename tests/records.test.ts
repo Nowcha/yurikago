@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSleepIntervals, parsePositiveMeasurement, summarizeCareDay } from '../src/lib/records';
+import { buildSleepIntervals, findLastFeeding, parsePositiveMeasurement, summarizeCareDay } from '../src/lib/records';
 import type { CareRecord } from '../src/types';
 
 function record(id: string, type: CareRecord['type'], amountMl?: number): CareRecord {
@@ -24,6 +24,7 @@ describe('summarizeCareDay', () => {
       feedingCount: 4,
       breastMinutes: 0,
       formulaMl: 140,
+      expressedMl: 0,
       pumpMl: 40,
       sleepMinutes: 0,
       peeCount: 2,
@@ -36,6 +37,7 @@ describe('summarizeCareDay', () => {
       feedingCount: 0,
       breastMinutes: 0,
       formulaMl: 0,
+      expressedMl: 0,
       pumpMl: 0,
       sleepMinutes: 0,
       peeCount: 0,
@@ -90,6 +92,47 @@ describe('summarizeCareDay', () => {
       nowAt: startAt + (70 * minute),
     });
     expect(summary.sleepMinutes).toBe(60);
+  });
+});
+
+describe('findLastFeeding', () => {
+  it('ミルク・直接母乳・搾母乳が対象で、搾乳（搾っただけ）は含めない', () => {
+    const records: CareRecord[] = [
+      { id: 'pump', type: 'pump', at: 500, amountMl: 80 },
+      { id: 'milk', type: 'formula', at: 300, amountMl: 100 },
+      { id: 'breast', type: 'breast_l', at: 100 },
+    ];
+    expect(findLastFeeding(records)?.id).toBe('milk');
+  });
+
+  it('搾母乳を飲ませた時刻も授乳として数える', () => {
+    const records: CareRecord[] = [
+      { id: 'milk', type: 'formula', at: 300 },
+      { id: 'expressed', type: 'expressed', at: 400, amountMl: 60 },
+    ];
+    expect(findLastFeeding(records)?.id).toBe('expressed');
+  });
+
+  it('並び順に依存せず最新を返し、授乳が無ければ undefined', () => {
+    const records: CareRecord[] = [
+      { id: 'old', type: 'breast_r', at: 100 },
+      { id: 'new', type: 'breast_l', at: 900 },
+      { id: 'mid', type: 'formula', at: 500 },
+    ];
+    expect(findLastFeeding(records)?.id).toBe('new');
+    expect(findLastFeeding([{ id: 'p', type: 'pump', at: 1 }])).toBeUndefined();
+  });
+
+  it('搾母乳は授乳回数と量に集計される', () => {
+    const records: CareRecord[] = [
+      { id: '1', type: 'expressed', at: 1, amountMl: 60 },
+      { id: '2', type: 'expressed', at: 2, amountMl: -5 },
+      { id: '3', type: 'pump', at: 3, amountMl: 90 },
+    ];
+    const summary = summarizeCareDay(records);
+    expect(summary.feedingCount).toBe(2);
+    expect(summary.expressedMl).toBe(60);
+    expect(summary.pumpMl).toBe(90);
   });
 });
 
