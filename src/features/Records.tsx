@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Heart, Milk, Droplets, Droplet, Baby, Moon, Sun, Bath, Thermometer, Scale,
+  Heart, Milk, GlassWater, Droplets, Droplet, Baby, Moon, Sun, Bath, Thermometer, Scale,
   StickyNote, Pill, Syringe, X, Pencil, ChevronLeft, ChevronRight, type LucideIcon,
 } from 'lucide-react';
 import type { Household, CareRecord, CareRecordType } from '../types';
@@ -9,7 +9,7 @@ import Sheet from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { describeWriteError } from '../lib/sync';
 import {
-  buildSleepIntervals, parsePositiveMeasurement, summarizeCareDay, type CareDayWindow,
+  buildSleepIntervals, findLastFeeding, parsePositiveMeasurement, summarizeCareDay, type CareDayWindow,
 } from '../lib/records';
 import { addDays, todayYmd } from '../lib/deadline';
 import {
@@ -20,6 +20,7 @@ const TYPE_META: Record<CareRecordType, { label: string; needsValue?: 'ml' | 'te
   breast_l: { label: '母乳 左' },
   breast_r: { label: '母乳 右' },
   formula: { label: 'ミルク', needsValue: 'ml' },
+  expressed: { label: '搾母乳', needsValue: 'ml' },
   pump: { label: '搾乳', needsValue: 'ml' },
   pee: { label: 'おしっこ' },
   poop: { label: 'うんち' },
@@ -32,8 +33,6 @@ const TYPE_META: Record<CareRecordType, { label: string; needsValue?: 'ml' | 'te
   vaccine: { label: '予防接種', needsValue: 'text' },
   memo: { label: 'メモ', needsValue: 'text' },
 };
-
-const FEEDING: CareRecordType[] = ['breast_l', 'breast_r', 'formula'];
 
 export default function Records({ household, records, uid }: {
   household: Household; records: CareRecord[]; uid: string;
@@ -73,7 +72,7 @@ export default function Records({ household, records, uid }: {
   }, [household.id, selectedDay]);
 
   const lastFeeding = useMemo(
-    () => records.find((r) => FEEDING.includes(r.type)),
+    () => findLastFeeding(records),
     [records],
   );
   const lastSleepState = useMemo(
@@ -136,6 +135,7 @@ export default function Records({ household, records, uid }: {
         <QuickBtn icon={Heart} label="母乳 左" onTap={() => quickAdd('breast_l')} />
         <QuickBtn icon={Heart} label="母乳 右" onTap={() => quickAdd('breast_r')} />
         <QuickBtn icon={Milk} label="ミルク" onTap={() => quickAdd('formula')} />
+        <QuickBtn icon={GlassWater} label="搾母乳" onTap={() => quickAdd('expressed')} />
         <QuickBtn icon={Droplet} label="おしっこ" onTap={() => quickAdd('pee')} />
         <QuickBtn icon={Baby} label="うんち" onTap={() => quickAdd('poop')} />
         <QuickBtn icon={Droplets} label="搾乳" onTap={() => quickAdd('pump')} />
@@ -371,15 +371,17 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
 function DaySummary({ records, selectedDay }: { records: CareRecord[]; selectedDay: string }) {
   const summary = summarizeCareDay(records, careDayWindow(selectedDay));
   const rows = [
-    ['授乳', `${summary.feedingCount}回 / ${summary.breastMinutes}分`],
+    ['授乳', `${summary.feedingCount}回`],
+    ['母乳', `${summary.breastMinutes}分`],
     ['ミルク', `${summary.formulaMl}ml`],
+    ['搾母乳', `${summary.expressedMl}ml`],
     ['搾乳', `${summary.pumpMl}ml`],
     ['睡眠', formatMinutes(summary.sleepMinutes)],
     ['おしっこ', `${summary.peeCount}回`],
     ['うんち', `${summary.poopCount}回`],
   ];
   return (
-    <dl className="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-ink/10 bg-ink/10 text-center">
+    <dl className="mt-2 grid grid-cols-4 gap-px overflow-hidden rounded-xl border border-ink/10 bg-ink/10 text-center">
       {rows.map(([label, value]) => (
         <div key={label} className="min-w-0 bg-white px-1 py-3">
           <dt className="truncate text-[10px] text-sub">{label}</dt>
@@ -393,6 +395,7 @@ function DaySummary({ records, selectedDay }: { records: CareRecord[]; selectedD
 const TIMELINE_ROWS: { label: string; types: CareRecordType[] }[] = [
   { label: '母乳', types: ['breast_l', 'breast_r'] },
   { label: 'ミルク', types: ['formula'] },
+  { label: '搾母乳', types: ['expressed'] },
   { label: 'おしっこ', types: ['pee'] },
   { label: 'うんち', types: ['poop'] },
 ];
@@ -596,7 +599,7 @@ function ValueSheet({ type, onSave, onClose }: {
   const [error, setError] = useState<string | null>(null);
   const kind = TYPE_META[type].needsValue!;
   const config = {
-    ml: { label: 'ミルク量（ml）', input: 'number', placeholder: '80' },
+    ml: { label: '量（ml）', input: 'number', placeholder: '80' },
     temp: { label: '体温（℃）', input: 'number', placeholder: '36.8' },
     weight: { label: '体重（g）', input: 'number', placeholder: '3200' },
     text: { label: 'メモ', input: 'text', placeholder: '' },

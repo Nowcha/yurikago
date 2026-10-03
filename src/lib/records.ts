@@ -1,9 +1,26 @@
-import type { CareRecord } from '../types';
+import type { CareRecord, CareRecordType } from '../types';
+
+/**
+ * 赤ちゃんに実際に飲ませた記録。搾乳（pump）は搾っただけで飲ませていないので含めない。
+ * 「前回の授乳から」の起点と授乳回数の両方がこの定義に従う。
+ */
+export const FEEDING_TYPES: readonly CareRecordType[] = ['breast_l', 'breast_r', 'formula', 'expressed'];
+
+/** 直近の授乳記録（記録の並び順に依存せず、時刻が最大のもの） */
+export function findLastFeeding(records: CareRecord[]): CareRecord | undefined {
+  return records.reduce<CareRecord | undefined>(
+    (latest, record) => (
+      FEEDING_TYPES.includes(record.type) && (!latest || record.at > latest.at) ? record : latest
+    ),
+    undefined,
+  );
+}
 
 export interface CareDaySummary {
   feedingCount: number;
   breastMinutes: number;
   formulaMl: number;
+  expressedMl: number;
   pumpMl: number;
   sleepMinutes: number;
   peeCount: number;
@@ -84,15 +101,17 @@ export function summarizeCareDay(
     const formulaMl = record.type === 'formula'
       ? positiveValue(record.amountMl)
       : 0;
+    const expressedMl = record.type === 'expressed' ? positiveValue(record.amountMl) : 0;
     const pumpMl = record.type === 'pump' ? positiveValue(record.amountMl) : 0;
     const breastMinutes = record.type === 'breast_l' || record.type === 'breast_r'
       ? positiveValue(record.durationMin)
       : 0;
     return {
       feedingCount: current.feedingCount
-        + (record.type === 'breast_l' || record.type === 'breast_r' || record.type === 'formula' ? 1 : 0),
+        + (FEEDING_TYPES.includes(record.type) ? 1 : 0),
       breastMinutes: current.breastMinutes + breastMinutes,
       formulaMl: current.formulaMl + formulaMl,
+      expressedMl: current.expressedMl + expressedMl,
       pumpMl: current.pumpMl + pumpMl,
       sleepMinutes: 0,
       peeCount: current.peeCount + (record.type === 'pee' ? 1 : 0),
@@ -102,6 +121,7 @@ export function summarizeCareDay(
     feedingCount: 0,
     breastMinutes: 0,
     formulaMl: 0,
+    expressedMl: 0,
     pumpMl: 0,
     sleepMinutes: 0,
     peeCount: 0,
