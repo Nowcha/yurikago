@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import type { Household, CareRecord, CareRecordType } from '../types';
 import {
-  addRecord, removeRecord, replaceRecord, setBreastMlPerMin, watchRecordsForDay,
+  addRecord, removeRecord, replaceRecord, setBreastMlPerMin, updateRecord, watchRecordsForDay,
 } from '../lib/store';
 import Sheet from '../components/Sheet';
 import FeedingVolumeChart from '../components/FeedingVolumeChart';
@@ -19,7 +19,7 @@ import {
   buildDailyVolumes, DEFAULT_BREAST_ML_PER_MIN, resolveBreastMlPerMin, summarizeFeedingVolume,
 } from '../lib/feedingVolume';
 import {
-  calcMilkPlan, MILK_FEEDINGS_PER_DAY, MILK_ML_PER_KG_MAX, MILK_ML_PER_KG_MIN,
+  calcMilkPlan, findWeightAsOf, MILK_FEEDINGS_PER_DAY, MILK_ML_PER_KG_MAX, MILK_ML_PER_KG_MIN,
 } from '../lib/milk';
 
 const TYPE_META: Record<CareRecordType, { label: string; needsValue?: 'ml' | 'temp' | 'weight' | 'text' }> = {
@@ -86,10 +86,7 @@ export default function Records({ household, records, uid }: {
     [records],
   );
   const sleeping = lastSleepState?.type === 'sleep';
-  const latestWeightG = useMemo(
-    () => records.find((r) => r.type === 'weight' && r.weightG != null)?.weightG,
-    [records],
-  );
+
 
   const enqueueRecord = (record: Omit<CareRecord, 'id'>): boolean => {
     setRecordError(null);
@@ -189,7 +186,13 @@ export default function Records({ household, records, uid }: {
 
       <VolumeTrend household={household} records={records} />
 
-      <MilkCalculator latestWeightG={latestWeightG} />
+      <MilkCalculator
+        key={selectedDay}
+        householdId={household.id}
+        uid={uid}
+        records={records}
+        selectedDay={selectedDay}
+      />
 
       </div>
 
@@ -313,12 +316,48 @@ function VolumeTrend({ household, records }: { household: Household; records: Ca
   );
 }
 
-function MilkCalculator({ latestWeightG }: { latestWeightG?: number }) {
-  const [weight, setWeight] = useState(
-    latestWeightG != null ? String(Math.round(latestWeightG) / 1000) : '',
-  );
+/** 体重は日単位で記録し、その日に入力が無ければ前日以前の最新を引き継ぐ */
+function MilkCalculator({ householdId, uid, records, selectedDay }: {
+  householdId: string; uid: string; records: CareRecord[]; selectedDay: string;
+}) {
+  const { notify } = useToast();
+  const window = careDayWindow(selectedDay);
+  const resolved = findWeightAsOf(records, window.endAt);
+  const resolvedKg = resolved ? String(Math.round(resolved.weightG) / 1000) : '';
+  const carried = resolved != null && resolved.at < window.startAt;
+  // null の間は記録から導いた値を表示する。読み込み完了より前に初期値を固定しない
+  const [draft, setDraft] = useState<string | null>(null);
+  const weight = draft ?? resolvedKg;
   const kg = parsePositiveMeasurement(weight);
   const plan = kg != null ? calcMilkPlan(kg) : null;
+
+  const saveWeight = (): void => {
+    if (draft == null) return;
+    const entered = parsePositiveMeasurement(draft);
+    if (entered == null) {
+      setDraft(null);
+      return;
+    }
+    const weightG = Math.round(entered * 1000);
+    if (resolved && !carried && resolved.weightG === weightG) {
+      setDraft(null);
+      return;
+    }
+    const sameDay = records
+      .filter((r) => r.type === 'weight' && r.at >= window.startAt && r.at < window.endAt)
+      .reduce<CareRecord | null>((latest, r) => (!latest || r.at > latest.at ? r : latest), null);
+    const write = sameDay
+      ? updateRecord(householdId, sameDay.id, { weightG })
+      : addRecord(householdId, {
+        type: 'weight',
+        // 過去の日は、その日の正午に記録する（日単位の値のため時刻に意味は無い）
+        at: selectedDay === todayYmd() ? Date.now() : new Date(`${selectedDay}T12:00:00`).getTime(),
+        by: uid,
+        weightG,
+      });
+    void write.catch((error: unknown) => notify(describeWriteError(error)));
+    setDraft(null);
+  };
 
   return (
     <section className="mt-7">
@@ -332,13 +371,19 @@ function MilkCalculator({ latestWeightG }: { latestWeightG?: number }) {
           min="0.1"
           step="0.01"
           value={weight}
-          onChange={(e) => setWeight(e.target.value)}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={saveWeight}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+          }}
           placeholder="3.2"
           className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-4 py-3 text-lg"
         />
-        {latestWeightG != null && (
-          <p className="mt-1.5 text-[11px] text-sub">最新の体重記録（{latestWeightG}g）から入力済みです</p>
-        )}
+        <p className="mt-1.5 text-[11px] text-sub">
+          {selectedDay === todayYmd() ? 'きょう' : selectedDay}の体重として保存されます。
+          {carried && resolved && `（${ymdOf(resolved.at)} の記録を引き継ぎ中）`}
+          {resolved == null && '（体重の記録がまだありません）'}
+        </p>
         {plan ? (
           <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-ink/10 bg-ink/10 text-center">
             <div className="bg-white px-1 py-3">
