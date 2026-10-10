@@ -16,7 +16,8 @@ import {
 } from '../lib/records';
 import { addDays, todayYmd } from '../lib/deadline';
 import {
-  buildDailyVolumes, DEFAULT_BREAST_ML_PER_MIN, resolveBreastMlPerMin, summarizeFeedingVolume,
+  buildDailyVolumes, DEFAULT_BREAST_ML_PER_MIN, estimateBreastMl, resolveBreastMlPerMin,
+  summarizeFeedingVolume,
 } from '../lib/feedingVolume';
 import {
   calcMilkPlan, findWeightAsOf, MILK_FEEDINGS_PER_DAY, MILK_ML_PER_KG_MAX, MILK_ML_PER_KG_MIN,
@@ -104,7 +105,7 @@ export default function Records({ household, records, uid }: {
   };
 
   const quickAdd = (type: CareRecordType): void => {
-    if (TYPE_META[type].needsValue) {
+    if (TYPE_META[type].needsValue || isBreast(type)) {
       setPending(type);
       return;
     }
@@ -211,6 +212,7 @@ export default function Records({ household, records, uid }: {
       {pending && (
         <ValueSheet
           type={pending}
+          breastMlPerMin={resolveBreastMlPerMin(household.breastMlPerMin)}
           onClose={() => setPending(null)}
           onSave={(payload) => enqueueRecord({
             type: pending,
@@ -421,6 +423,7 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
 }) {
   const { notify, notifyWithAction } = useToast();
   const [editing, setEditing] = useState<CareRecord | null>(null);
+  const breastMlPerMin = resolveBreastMlPerMin(household.breastMlPerMin);
   const heading = selectedDay === todayYmd() ? 'きょうの記録' : `${selectedDay} の記録`;
 
   return (
@@ -448,6 +451,8 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
               <span className="text-xs text-sub">
                 {r.amountMl != null && `${r.amountMl}ml`}
                 {r.durationMin != null && `${r.durationMin}分`}
+                {isBreast(r.type) && estimateBreastMl(r.durationMin, breastMlPerMin) != null
+                  && `（約${estimateBreastMl(r.durationMin, breastMlPerMin)}ml）`}
                 {r.temperature != null && `${r.temperature.toFixed(1)}℃`}
                 {r.weightG != null && `${r.weightG}g`}
                 {r.note}
@@ -489,6 +494,7 @@ function DayLog({ household, records, contextRecords, selectedDay, loading, hasE
       {editing && (
         <RecordEditSheet
           record={editing}
+          breastMlPerMin={resolveBreastMlPerMin(household.breastMlPerMin)}
           householdId={household.id}
           onClose={() => setEditing(null)}
         />
@@ -536,6 +542,8 @@ function DaySummary({ records, selectedDay, breastMlPerMin }: {
     </>
   );
 }
+
+const isBreast = (type: CareRecordType): boolean => type === 'breast_l' || type === 'breast_r';
 
 const TIMELINE_ROWS: { label: string; types: CareRecordType[] }[] = [
   { label: '母乳', types: ['breast_l', 'breast_r'] },
@@ -619,8 +627,9 @@ function TimelineRow({ label, children }: { label: string; children: React.React
   );
 }
 
-function RecordEditSheet({ record, householdId, onClose }: {
+function RecordEditSheet({ record, householdId, breastMlPerMin, onClose }: {
   record: CareRecord;
+  breastMlPerMin: number;
   householdId: string;
   onClose: () => void;
 }) {
@@ -721,6 +730,7 @@ function RecordEditSheet({ record, householdId, onClose }: {
               onChange={(event) => setDuration(event.target.value)}
               className="mt-1 w-full rounded-xl border border-ink/15 bg-base px-4 py-3 text-sm font-normal text-ink"
             />
+            <BreastEstimate minutes={parsePositiveMeasurement(duration)} breastMlPerMin={breastMlPerMin} />
           </label>
         )}
         {error && <p className="mt-3 text-sm text-alert">{error}</p>}
@@ -735,15 +745,29 @@ function RecordEditSheet({ record, householdId, onClose }: {
   );
 }
 
-function ValueSheet({ type, onSave, onClose }: {
+/** 授乳時間から試算した母乳量。入力が無い・不正なときは何も出さない */
+function BreastEstimate({ minutes, breastMlPerMin }: { minutes: number | null; breastMlPerMin: number }) {
+  const ml = estimateBreastMl(minutes ?? undefined, breastMlPerMin);
+  if (ml == null) return null;
+  return (
+    <p className="mt-2 text-sm font-normal text-ink">
+      試算 約{ml}ml
+      <span className="ml-1 text-[11px] text-sub">（授乳1分あたり{breastMlPerMin}mlで計算）</span>
+    </p>
+  );
+}
+
+function ValueSheet({ type, breastMlPerMin, onSave, onClose }: {
   type: CareRecordType;
+  breastMlPerMin: number;
   onSave: (p: Partial<CareRecord>) => boolean;
   onClose: () => void;
 }) {
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const kind = TYPE_META[type].needsValue!;
+  const kind = isBreast(type) ? 'min' : TYPE_META[type].needsValue!;
   const config = {
+    min: { label: '授乳時間（分）', input: 'number', placeholder: '10' },
     ml: { label: '量（ml）', input: 'number', placeholder: '80' },
     temp: { label: '体温（℃）', input: 'number', placeholder: '36.8' },
     weight: { label: '体重（g）', input: 'number', placeholder: '3200' },
@@ -762,6 +786,7 @@ function ValueSheet({ type, onSave, onClose }: {
         return;
       }
       if (kind === 'ml') payload.amountMl = measurement;
+      else if (kind === 'min') payload.durationMin = measurement;
       else if (kind === 'temp') payload.temperature = measurement;
       else payload.weightG = measurement;
     }
@@ -788,6 +813,9 @@ function ValueSheet({ type, onSave, onClose }: {
           placeholder={config.placeholder}
           className="mt-3 w-full rounded-xl border border-ink/15 bg-base px-4 py-3.5 text-lg"
         />
+        {kind === 'min' && (
+          <BreastEstimate minutes={parsePositiveMeasurement(value)} breastMlPerMin={breastMlPerMin} />
+        )}
         {error && <p className="mt-3 text-sm text-alert">{error}</p>}
         <button
           onClick={save}
@@ -796,6 +824,17 @@ function ValueSheet({ type, onSave, onClose }: {
         >
           記録する
         </button>
+        {kind === 'min' && (
+          <button
+            onClick={() => {
+              if (onSave({})) onClose();
+              else setError('記録を保存できませんでした。');
+            }}
+            className="mt-2 w-full rounded-full border border-ink/15 py-3 text-sm font-medium text-ink hover:bg-surface"
+          >
+            時間なしで記録
+          </button>
+        )}
     </Sheet>
   );
 }

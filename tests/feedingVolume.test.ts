@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildDailyVolumes, resolveBreastMlPerMin, summarizeFeedingVolume, DEFAULT_BREAST_ML_PER_MIN,
+  buildDailyVolumes, estimateBreastMl, resolveBreastMlPerMin, summarizeFeedingVolume, DEFAULT_BREAST_ML_PER_MIN,
 } from '../src/lib/feedingVolume';
 import type { CareRecord } from '../src/types';
 
@@ -50,5 +50,19 @@ describe('resolveBreastMlPerMin', () => {
     expect(resolveBreastMlPerMin(0)).toBe(DEFAULT_BREAST_ML_PER_MIN);
     expect(resolveBreastMlPerMin(Number.NaN)).toBe(DEFAULT_BREAST_ML_PER_MIN);
     expect(resolveBreastMlPerMin(4.5)).toBe(4.5);
+  });
+});
+
+describe('estimateBreastMl', () => {
+  it('授乳時間×係数を四捨五入して返す', () => {
+    expect(estimateBreastMl(10, 3)).toBe(30);
+    expect(estimateBreastMl(7.5, 3)).toBe(23);
+  });
+
+  it('時間が未入力・不正なら null', () => {
+    expect(estimateBreastMl(undefined, 3)).toBeNull();
+    expect(estimateBreastMl(0, 3)).toBeNull();
+    expect(estimateBreastMl(-5, 3)).toBeNull();
+    expect(estimateBreastMl(Number.NaN, 3)).toBeNull();
   });
 });
