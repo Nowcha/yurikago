@@ -23,6 +23,13 @@ export function resolveBreastMlPerMin(value: number | undefined): number {
   return value != null && Number.isFinite(value) && value > 0 ? value : DEFAULT_BREAST_ML_PER_MIN;
 }
 
+/** 授乳時間(分)から母乳量を試算する。時間が不正なら null */
+export function estimateBreastMl(minutes: number | undefined, breastMlPerMin: number): number | null {
+  return minutes != null && Number.isFinite(minutes) && minutes > 0
+    ? Math.round(minutes * breastMlPerMin)
+    : null;
+}
+
 /** 母乳（推定）・ミルク・搾母乳の量と合計。搾乳（pump）は飲ませていないので含めない */
 export function summarizeFeedingVolume(
   records: CareRecord[],
