@@ -1,7 +1,7 @@
 import type { Assignee, Household, TaskCategory } from '../types';
 
 export const CATEGORY_LABEL: Record<TaskCategory, string> = {
-  procedure: '手続き', purchase: '購入', prep: '準備', health: '健康', work: '会社',
+  procedure: '手続き', purchase: '購入', prep: '準備', health: '健康', work: '会社', event: '行事',
 };
 
 export const AUTHORITY_LABEL: Record<string, string> = {

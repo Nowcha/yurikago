@@ -19,10 +19,10 @@ export default function Dashboard({
   const { week, day } = pregnancyWeek(household.dueDate, today);
   const remaining = daysUntilDue(household.dueDate, today);
 
-  // 出生後、afterBirthタスクはスプリントビューに表示するため通常リストから除く（二重表示防止）
+  // 出生後、スプリントビューに出るタスク（産後14日以内）は通常リストから除く（二重表示防止）
+  const sprintIds = new Set(born ? sprintTasks(tasks).map((t) => t.id) : []);
   const active = tasks.filter((t) =>
-    (t.status === 'todo' || t.status === 'doing') &&
-    !(born && t.trigger.type === 'afterBirth'));
+    (t.status === 'todo' || t.status === 'doing') && !sprintIds.has(t.id));
   const overdue = active.filter((t) => urgency(t.dueDateResolved, today) === 'overdue');
   const imminent = active
     .filter((t) => urgency(t.dueDateResolved, today) === 'imminent')

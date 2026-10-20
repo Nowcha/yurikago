@@ -101,6 +101,38 @@ describe('procedure-master.json: 産後手続きの起算日', () => {
   });
 });
 
+describe('procedure-master.json: 出産後の行事', () => {
+  const events = (procedureMaster.templates as {
+    id: string; category: string; prepTasks?: string[]; notes?: string;
+  }[]).filter((template) => template.category === 'event');
+
+  it('お七夜・お宮参り・内祝い・お食い初め・初節句・1歳の誕生日が揃っている', () => {
+    expect(events.map((event) => event.id)).toEqual(expect.arrayContaining([
+      'event-oshichiya',
+      'event-omiyamairi',
+      'event-uchiiwai',
+      'event-okuizome',
+      'event-hatsuzekku-girl',
+      'event-hatsuzekku-boy',
+      'event-first-birthday',
+    ]));
+  });
+
+  it('各行事に、やることの一覧と内容の説明がある', () => {
+    const thin = events.filter((event) => (event.prepTasks?.length ?? 0) < 5 || !event.notes);
+    expect(thin).toEqual([]);
+  });
+
+  it('期限は出生日から決まる（お宮参り=31日目、お食い初め=100日目、初節句は翌年に回す）', () => {
+    expect(resolveDueDate(findTemplate('event-oshichiya').trigger, dueDate, birthDate)).toBe('2026-10-11');
+    expect(resolveDueDate(findTemplate('event-omiyamairi').trigger, dueDate, birthDate)).toBe('2026-11-04');
+    expect(resolveDueDate(findTemplate('event-okuizome').trigger, dueDate, birthDate)).toBe('2027-01-12');
+    expect(resolveDueDate(findTemplate('event-hatsuzekku-girl').trigger, dueDate, birthDate)).toBe('2027-03-03');
+    expect(resolveDueDate(findTemplate('event-hatsuzekku-boy').trigger, dueDate, birthDate)).toBe('2027-05-05');
+    expect(resolveDueDate(findTemplate('event-first-birthday').trigger, dueDate, birthDate)).toBe('2027-10-05');
+  });
+});
+
 // 受け入れテストE: 「産後に様子見て」バッジ対象品目
 describe('purchase-master.json: waitUntilBornフラグ', () => {
   const items = purchaseMaster.items as { name: string; waitUntilBorn?: boolean }[];

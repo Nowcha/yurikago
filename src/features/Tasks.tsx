@@ -485,7 +485,9 @@ function TaskDetail({ task, household, onClose }: {
 
         {task.prepTasks && task.prepTasks.length > 0 && (
           <>
-            <p className="mt-5 text-xs font-bold text-sub">産前にできる準備</p>
+            <p className="mt-5 text-xs font-bold text-sub">
+              {task.category === 'event' ? 'やること' : '産前にできる準備'}
+            </p>
             <ul className="mt-1.5 space-y-2">
               {task.prepTasks.map((p, i) => (
                 <li key={i}>
@@ -509,7 +511,7 @@ function TaskDetail({ task, household, onClose }: {
         )}
 
         {task.notes && (
-          <p className="mt-5 rounded-xl bg-base p-3 text-sm leading-relaxed text-ink/80">
+          <p className="mt-5 whitespace-pre-line rounded-xl bg-base p-3 text-sm leading-relaxed text-ink/80">
             {task.notes}
           </p>
         )}
