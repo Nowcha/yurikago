@@ -77,12 +77,15 @@ households/{householdId}
 interface TaskTemplate {
   id: string;
   title: string;
-  category: 'procedure' | 'purchase' | 'prep' | 'health' | 'work';
+  category: 'procedure' | 'purchase' | 'prep' | 'health' | 'work' | 'event';
   authority?: 'koto' | 'tokyo' | 'national' | 'employer' | 'hospital';
   trigger:
     | { type: 'week'; week: number }
     | { type: 'beforeDue'; days: number }
-    | { type: 'afterBirth'; days: number };
+    | { type: 'afterBirth'; days: number; countFrom?: 'birthInclusive' | 'nextDay' }
+    | { type: 'nextDateAfterBirth'; month: number; day: number; minDays: number } // 初節句など暦で決まる行事
+    | { type: 'birthday'; years: number }                                           // 満n歳の誕生日
+    | { type: 'dateInYearAfterBirth'; years: number; month: number; day: number }; // 七五三など、満n歳になる年の月日
   deadline?: 'hard' | 'soft';
   conditions?: ProfileCondition[];
   prepTasks?: string[];        // 産後タスクでも産前にできる準備
@@ -102,7 +105,8 @@ interface TaskInstance extends TaskTemplate {
 - 手動タスクの追加・編集・削除
 
 ### 4.3 手続きマスター
-`src/data/procedure-master.json` 参照（江東区・東京都・国・会社の40手続きを収録）。
+`src/data/procedure-master.json` 参照（江東区・東京都・国・会社の40手続きと、出産後の行事10件を収録）。
+行事（category: 'event'）はお七夜・お宮参り・出産内祝い・お食い初め・初節句（女の子／男の子）・1歳の誕生日・七五三（3歳／5歳男の子／7歳女の子）。`prepTasks` を「やること」として表示し、`notes` に行事の意味・時期の目安・地域差を記載する。性別で分かれる初節句・七五三は両方を生成し、該当しない方を利用者が「対象外」にする。
 主要期限:
 - 出生届: 出生日含め14日以内（hard）
 - 児童手当: 出生翌日から15日以内（hard、遅れると遡及されない月が発生）

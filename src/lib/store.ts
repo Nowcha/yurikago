@@ -13,7 +13,7 @@ import type {
   Household, HouseholdProfile, TaskInstance, TaskTemplate, PurchaseItem, PurchaseCategory,
   PurchaseMethod, CareRecord,
 } from '../types';
-import { resolveDueDate } from './deadline';
+import { isBirthTrigger, resolveDueDate } from './deadline';
 import procedureMaster from '../data/procedure-master.json';
 import purchaseMaster from '../data/purchase-master.json';
 import { collectAllPages } from './pagination';
@@ -262,12 +262,12 @@ export async function updateHouseholdSettings(
   await batch.commit();
 }
 
-/** 出生イベント: 出生日を確定し、afterBirthタスクの期限を一括再計算（Phase 2） */
+/** 出生イベント: 出生日を確定し、出生日基準のタスクの期限を一括再計算（Phase 2） */
 export async function registerBirth(household: Household, tasks: TaskInstance[], birthDate: string) {
   const batch = writeBatch(db);
   batch.update(doc(db, 'households', household.id), { birthDate });
   for (const t of tasks) {
-    if (t.trigger.type === 'afterBirth') {
+    if (isBirthTrigger(t.trigger)) {
       batch.update(doc(db, 'households', household.id, 'tasks', t.id), {
         dueDateResolved: t.dueDateOverride
           ?? resolveDueDate(t.trigger, household.dueDate, birthDate),

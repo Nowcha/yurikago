@@ -1,9 +1,15 @@
 export type Trigger =
   | { type: 'week'; week: number }
   | { type: 'beforeDue'; days: number }
-  | { type: 'afterBirth'; days: number; countFrom?: 'birthInclusive' | 'nextDay' };
+  | { type: 'afterBirth'; days: number; countFrom?: 'birthInclusive' | 'nextDay' }
+  // 出生日+minDays以降で最初に来る月日（初節句など暦で決まる行事）
+  | { type: 'nextDateAfterBirth'; month: number; day: number; minDays: number }
+  // 満n歳の誕生日（2/29生まれは平年なら3/1）
+  | { type: 'birthday'; years: number }
+  // 出生年+years年の月日（七五三など、その年に満n歳になる年の行事）
+  | { type: 'dateInYearAfterBirth'; years: number; month: number; day: number };
 
-export type TaskCategory = 'procedure' | 'purchase' | 'prep' | 'health' | 'work';
+export type TaskCategory = 'procedure' | 'purchase' | 'prep' | 'health' | 'work' | 'event';
 export type Authority = 'koto' | 'tokyo' | 'national' | 'employer' | 'hospital';
 export type TaskStatus = 'todo' | 'doing' | 'done' | 'na';
 export type Assignee = 'partner1' | 'partner2' | 'both';
