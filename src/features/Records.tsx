@@ -12,7 +12,7 @@ import FeedingVolumeChart from '../components/FeedingVolumeChart';
 import { useToast } from '../components/Toast';
 import { describeWriteError } from '../lib/sync';
 import {
-  buildSleepIntervals, findLastFeeding, parsePositiveMeasurement, summarizeCareDay, type CareDayWindow,
+  buildSleepIntervals, findLastFeeding, nextFeedingTarget, parsePositiveMeasurement, summarizeCareDay, type CareDayWindow,
 } from '../lib/records';
 import { addDays, todayYmd } from '../lib/deadline';
 import {
@@ -51,9 +51,9 @@ export default function Records({ household, records, uid }: {
   const [dayLoading, setDayLoading] = useState(true);
   const [dayError, setDayError] = useState(false);
   const [recordError, setRecordError] = useState<string | null>(null);
-  const [, tick] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 60_000); // 経過時間表示の更新
+    const t = setInterval(() => setNow(Date.now()), 60_000); // 経過時間表示の更新
     return () => clearInterval(t);
   }, []);
 
@@ -126,6 +126,7 @@ export default function Records({ household, records, uid }: {
           <p className="mt-1 font-display text-3xl font-bold text-ink">
             {lastFeeding ? elapsed(lastFeeding.at) : '記録なし'}
           </p>
+          {lastFeeding && <NextFeeding lastFeedingAt={lastFeeding.at} now={now} />}
           {sleeping && (
             <p className="mt-1 text-xs text-sub">
               ねんね中（{elapsed(lastSleepState!.at)}経過）
@@ -877,6 +878,23 @@ function recordValue(record: CareRecord): string {
   if (record.temperature != null) return String(record.temperature);
   if (record.weightG != null) return String(record.weightG);
   return record.note ?? '';
+}
+
+function NextFeeding({ lastFeedingAt, now }: { lastFeedingAt: number; now: number }) {
+  const { at, remainingMinutes } = nextFeedingTarget(lastFeedingAt, now);
+  const overdue = remainingMinutes <= 0;
+  return (
+    <p className={`mt-1 text-xs ${overdue ? 'font-bold text-ink' : 'text-sub'}`}>
+      次回授乳目安 {hhmm(at)}
+      （{overdue ? `${minutesText(-remainingMinutes)}経過` : `あと${minutesText(remainingMinutes)}`}）
+    </p>
+  );
+}
+
+function minutesText(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}時間${m}分` : `${m}分`;
 }
 
 function elapsed(ms: number): string {

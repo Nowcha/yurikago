@@ -16,6 +16,18 @@ export function findLastFeeding(records: CareRecord[]): CareRecord | undefined {
   );
 }
 
+/** 授乳間隔の目安（3時間） */
+export const FEEDING_INTERVAL_MS = 3 * 60 * 60_000;
+
+/** 次回授乳の目安。前回の授乳から目安間隔を足した時刻と、現在までの残り時間（過ぎていれば負） */
+export function nextFeedingTarget(
+  lastFeedingAt: number,
+  nowAt: number,
+): { at: number; remainingMinutes: number } {
+  const at = lastFeedingAt + FEEDING_INTERVAL_MS;
+  return { at, remainingMinutes: Math.ceil((at - nowAt) / 60_000) };
+}
+
 /**
  * 授乳回数。同じ時刻（分単位）の母乳・ミルク・搾母乳は、続けて飲ませた1回として数える
  */
