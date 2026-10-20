@@ -98,10 +98,19 @@ describe('resolveDueDate: トリガーごとの起算規則', () => {
     expect(resolveDueDate({ type: 'birthday', years: 1 }, due, null)).toBeNull();
   });
 
+  it('dateInYearAfterBirth: 出生年+n年の月日（七五三は満n歳になる年の11/15）', () => {
+    const trigger = { type: 'dateInYearAfterBirth', years: 3, month: 11, day: 15 } as const;
+    expect(resolveDueDate(trigger, due, '2026-10-05')).toBe('2029-11-15');
+    // 11/16以降生まれでも、満3歳になる年の11/15
+    expect(resolveDueDate(trigger, due, '2026-12-20')).toBe('2029-11-15');
+    expect(resolveDueDate(trigger, due, null)).toBeNull();
+  });
+
   it('isBirthTrigger: 出生日で期限が決まるトリガーだけを対象にする', () => {
     expect(isBirthTrigger({ type: 'afterBirth', days: 14 })).toBe(true);
     expect(isBirthTrigger({ type: 'nextDateAfterBirth', month: 5, day: 5, minDays: 60 })).toBe(true);
     expect(isBirthTrigger({ type: 'birthday', years: 1 })).toBe(true);
+    expect(isBirthTrigger({ type: 'dateInYearAfterBirth', years: 3, month: 11, day: 15 })).toBe(true);
     expect(isBirthTrigger({ type: 'beforeDue', days: 30 })).toBe(false);
     expect(isBirthTrigger({ type: 'week', week: 20 })).toBe(false);
   });

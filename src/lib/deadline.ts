@@ -49,6 +49,7 @@ export function daysUntilDue(dueDate: string, today: string): number {
  *     - 'nextDay'（既定）: 出生日の翌日から起算してn日以内 → 出生日 + n。例: 児童手当（15日特例）
  * - nextDateAfterBirth: 出生日+minDays以降で最初に来る month/day。例: 初節句（3/3・5/5）
  * - birthday: 満years歳の誕生日。2/29生まれは平年なら3/1
+ * - dateInYearAfterBirth: 出生年+years年の month/day。例: 七五三（満n歳になる年の11/15）
  *   出生日基準のトリガーは、出生日未確定（birthDate == null）の場合 null を返す
  */
 export function resolveDueDate(
@@ -81,6 +82,11 @@ export function resolveDueDate(
       const [y, m, d] = birthDate.split('-').map(Number);
       return toYmd(new Date(Date.UTC(y + trigger.years, m - 1, d, 12)));
     }
+    case 'dateInYearAfterBirth': {
+      if (!birthDate) return null;
+      const year = toDate(birthDate).getUTCFullYear() + trigger.years;
+      return toYmd(new Date(Date.UTC(year, trigger.month - 1, trigger.day, 12)));
+    }
   }
 }
 
@@ -88,7 +94,8 @@ export function resolveDueDate(
 export function isBirthTrigger(trigger: Trigger): boolean {
   return trigger.type === 'afterBirth'
     || trigger.type === 'nextDateAfterBirth'
-    || trigger.type === 'birthday';
+    || trigger.type === 'birthday'
+    || trigger.type === 'dateInYearAfterBirth';
 }
 
 export type Urgency = 'overdue' | 'imminent' | 'upcoming' | 'later' | 'unscheduled';
