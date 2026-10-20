@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildSleepIntervals, countFeedingSessions, findLastFeeding, parsePositiveMeasurement, summarizeCareDay } from '../src/lib/records';
+import {
+  buildSleepIntervals, countFeedingSessions, findLastFeeding, nextFeedingTarget, parsePositiveMeasurement, summarizeCareDay,
+} from '../src/lib/records';
 import type { CareRecord } from '../src/types';
 
 const MINUTE = 60_000;
@@ -199,5 +201,19 @@ describe('parsePositiveMeasurement', () => {
 
   it.each(['', '0', '-1', 'NaN', 'Infinity'])('%sは無効値として扱う', (value) => {
     expect(parsePositiveMeasurement(value)).toBeNull();
+  });
+});
+
+describe('nextFeedingTarget', () => {
+  it('前回の授乳から3時間後を目安とし、残り時間を分で返す', () => {
+    const last = 1_000 * MINUTE;
+    expect(nextFeedingTarget(last, last + 60 * MINUTE)).toEqual({ at: last + 180 * MINUTE, remainingMinutes: 120 });
+  });
+
+  it('端数の秒は切り上げ、目安時刻ちょうどは0、過ぎたら負になる', () => {
+    const last = 1_000 * MINUTE;
+    expect(nextFeedingTarget(last, last + 179 * MINUTE + 30_000).remainingMinutes).toBe(1);
+    expect(nextFeedingTarget(last, last + 180 * MINUTE).remainingMinutes).toBe(0);
+    expect(nextFeedingTarget(last, last + 200 * MINUTE).remainingMinutes).toBe(-20);
   });
 });
