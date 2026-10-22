@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Heart, Milk, GlassWater, Droplets, Droplet, Baby, Moon, Sun, Bath, Thermometer, Scale,
+  Check, Heart, Milk, GlassWater, Droplets, Droplet, Baby, Moon, Sun, Bath, Thermometer, Scale,
   StickyNote, Pill, Syringe, X, Pencil, ChevronLeft, ChevronRight, type LucideIcon,
 } from 'lucide-react';
 import type { Household, CareRecord, CareRecordType } from '../types';
@@ -104,12 +104,13 @@ export default function Records({ household, records, uid }: {
     }
   };
 
-  const quickAdd = (type: CareRecordType): void => {
+  /** その場で記録できた場合のみ true。入力シートを開いた場合はシート自体が反応になる */
+  const quickAdd = (type: CareRecordType): boolean => {
     if (TYPE_META[type].needsValue || isBreast(type)) {
       setPending(type);
-      return;
+      return false;
     }
-    enqueueRecord({ type, at: Date.now(), by: uid });
+    return enqueueRecord({ type, at: Date.now(), by: uid });
   };
 
   return (
@@ -227,18 +228,47 @@ export default function Records({ household, records, uid }: {
   );
 }
 
+const RECORDED_FEEDBACK_MS = 900;
+
 function QuickBtn({ icon: Icon, label, onTap, emph }: {
-  icon: LucideIcon; label: string; onTap: () => void; emph?: boolean;
+  icon: LucideIcon; label: string; onTap: () => boolean; emph?: boolean;
 }) {
+  // 連打時もアニメーションを頭から再生し直すため、回数をkeyにする
+  const [recordedCount, setRecordedCount] = useState(0);
+  const [recorded, setRecorded] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const handleTap = () => {
+    if (!onTap()) return;
+    navigator.vibrate?.(15);
+    setRecorded(true);
+    setRecordedCount((n) => n + 1);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setRecorded(false), RECORDED_FEEDBACK_MS);
+  };
+
+  // 記録直後は白黒を反転し、アイコンをチェックに差し替えて「押せた」ことを示す
+  const inverted = recorded ? !emph : emph;
   return (
     <button
-      onClick={onTap}
-      className={`flex flex-col items-center gap-1.5 rounded-2xl border py-4 text-xs font-medium active:scale-95 ${
-        emph ? 'border-ink bg-ink text-white' : 'border-ink/10 bg-white text-ink'
+      onClick={handleTap}
+      className={`relative flex flex-col items-center gap-1.5 rounded-2xl border py-4 text-xs font-medium transition-transform duration-100 active:scale-90 ${
+        inverted ? 'border-ink bg-ink text-white' : 'border-ink/10 bg-white text-ink'
       }`}
     >
-      <Icon size={22} strokeWidth={1.6} aria-hidden />
+      {recorded && (
+        <span
+          key={recordedCount}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 animate-record-done rounded-2xl border-2 border-ink"
+        />
+      )}
+      {recorded
+        ? <Check size={22} strokeWidth={2.2} aria-hidden />
+        : <Icon size={22} strokeWidth={1.6} aria-hidden />}
       {label}
+      <span className="sr-only" aria-live="polite">{recorded ? `${label}を記録しました` : ''}</span>
     </button>
   );
 }
