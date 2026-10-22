@@ -14,6 +14,13 @@
   --color-alert: #D64545;     /* 法定期限・破壊的操作のみ */
   --font-display: "Noto Sans JP", system-ui, sans-serif;
   --font-sans: "Noto Sans JP", system-ui, sans-serif;
+
+  /* きろくのワンタップ記録が成功したときに、ボタンの外へ罫線が広がって消える */
+  --animate-record-done: record-done 600ms ease-out forwards;
+  @keyframes record-done {
+    from { transform: scale(1); opacity: 1; }
+    to { transform: scale(1.12); opacity: 0; }
+  }
 }
 
 html { -webkit-tap-highlight-color: transparent; }
