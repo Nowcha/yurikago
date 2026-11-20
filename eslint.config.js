@@ -13,7 +13,7 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      // CLAUDE.md: any禁止（不明な型は unknown + 型ガード）
+      // AGENTS.md: any禁止（不明な型は unknown + 型ガード）
       '@typescript-eslint/no-explicit-any': 'error',
       // Firestoreの購読を張り直すときに、読み込み中フラグや前の世帯のデータを
       // 同期的に捨てている箇所が該当する（App/SyncBanner/Records）。

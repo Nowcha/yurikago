@@ -21,7 +21,7 @@ import { DEFAULT_HOUSEHOLD_PROFILE, normalizeHouseholdProfile } from './profile'
 
 // ─────────────────────────────────────────────────────────────
 // TODO(セットアップ): Firebaseコンソールの「プロジェクトの設定 > マイアプリ」から
-// Web設定値を貼り付ける。これは公開クライアント識別子でありコミット可（CLAUDE.md参照）
+// Web設定値を貼り付ける。これは公開クライアント識別子でありコミット可（AGENTS.md参照）
 // ─────────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: 'AIzaSyD7-R7UOs-lTbE7Ja-NQ1QpU8Vd_Aax7Ao',

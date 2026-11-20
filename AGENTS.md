@@ -1,5 +1,4 @@
-<!-- GENERATED from CLAUDE.md - do not edit directly. source-sha256: f2aa293311fbd12245c847159a88be830fe096a5c2af82bdab64acde92546e06 -->
-# CLAUDE.md
+# AGENTS.md
 
 ## プロジェクト概要
 
