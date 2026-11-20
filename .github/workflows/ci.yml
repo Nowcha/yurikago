@@ -37,7 +37,7 @@ jobs:
       - name: Build
         run: npm run build
       # ルールの配備はGitHub Pagesと違って自動化していない。
-      # 自動化にはCIへ認証情報を置く必要があり、zero-API-key原則（CLAUDE.md）に反するため。
+      # 自動化にはCIへ認証情報を置く必要があり、zero-API-key原則（AGENTS.md）に反するため。
       # 配備を忘れるとリポジトリだけ直って本番は脆弱なまま残るので、PR上で警告する
       - name: Warn if firestore.rules changed
         run: |
